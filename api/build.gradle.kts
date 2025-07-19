@@ -1,3 +1,10 @@
+import java.util.Properties
+import kotlin.apply
+
+val props = Properties().apply { load(rootProject.file("project.properties").inputStream()) }
+val projectGroup = props.getProperty("project_group")
+val projectName = props.getProperty("project_name")
+
 plugins {
     // Apply the shared build logic from a convention plugin.
     // The shared code is located in `buildSrc/src/main/kotlin/buildSrc.common.gradle.kts`.
@@ -18,5 +25,5 @@ dependencies {
 application {
     // Define the Fully Qualified Name for the application main class
     // (Note that Kotlin compiles `App.kt` to a class with FQN `com.example.app.AppKt`.)
-    mainClass = "com.solvesall.ktor_template.AppKt"
+    mainClass = "$projectGroup.$projectName.api.MainKt"
 }

@@ -1,12 +1,17 @@
+import java.util.Properties
+import kotlin.apply
+
+val props = Properties().apply { load(rootProject.file("project.properties").inputStream()) }
+val ktorVersion = props.getProperty("ktor_version")
+
 plugins {
     kotlin("jvm")
 }
 
 dependencies {
-    val ktor = "3.2.2"
-    implementation("io.ktor:ktor-client-content-negotiation:$ktor")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor")
-    implementation("io.ktor:ktor-client-core:$ktor")
-    implementation("io.ktor:ktor-client-cio:$ktor")
-    implementation("io.ktor:ktor-client-auth:$ktor")
+    implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+    implementation("io.ktor:ktor-client-core:$ktorVersion")
+    implementation("io.ktor:ktor-client-cio:$ktorVersion")
+    implementation("io.ktor:ktor-client-auth:$ktorVersion")
 }

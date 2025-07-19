@@ -1,6 +1,11 @@
 import org.gradle.api.tasks.testing.logging.TestLogEvent
-import java.io.FileInputStream
 import java.util.Properties
+
+val props = Properties().apply { load(rootProject.file("project.properties").inputStream()) }
+val projectVersion = props.getProperty("project_version")
+val projectDescription = props.getProperty("project_description")
+val projectGroup = props.getProperty("project_group")
+val jdk = props.getProperty("jdk").toInt()
 
 plugins {
     kotlin("jvm")
@@ -9,7 +14,7 @@ plugins {
     id("org.jetbrains.kotlinx.kover")
 }
 kotlin {
-    jvmToolchain(21)
+    jvmToolchain(jdk)
 }
 repositories {
     mavenCentral()
@@ -30,7 +35,7 @@ tasks.dokkaHtml {
                 ),
             )
             includeNonPublic.set(true)
-            jdkVersion.set(21)
+            jdkVersion.set(jdk)
             reportUndocumented.set(true)
             skipEmptyPackages.set(false)
         }
@@ -42,16 +47,10 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 }
 
-val properties = Properties()
-val input = FileInputStream(file("${rootDir}/project.properties"))
-properties.load(input)
-input.close()
 
-group = "com.solvesall"
-rootProject.version = properties.getProperty("project_version")
-rootProject.description = properties.getProperty("project_description")
-
-
+group = projectGroup
+rootProject.version = projectVersion
+rootProject.description = projectDescription
 
 tasks.withType<Test>().configureEach {
     // Configure all test Gradle tasks to use JUnitPlatform.
