@@ -29,6 +29,6 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin")
     implementation("org.jetbrains.kotlin:kotlin-serialization:$kotlin")
     implementation("org.jetbrains.kotlinx:kover-gradle-plugin:$kgp")
-    implementation("org.jetbrains.dokka:org.jetbrains.dokka.gradle.plugin:$dokka")
+    implementation("org.jetbrains.dokka:dokka-gradle-plugin:$dokka")
     implementation("com.adarshr:gradle-test-logger-plugin:$gtlv")
 }

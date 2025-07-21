@@ -12,10 +12,10 @@ class OpenApi : Plugin<Project> {
 	override fun apply(project: Project) {
 		val extension = project.extensions.create<OpenApiExtension>(className)
 
-		project.task(className) {
+		project.tasks.register(className) {
 			this.group = "buildSrc"
 			this.description = "Fix OpenApi generated documentation."
-			doLast {
+			this.doLast {
 				val outputDir = File(this.project.projectDir, extension.outputDir.get())
 				val inputDir = File(this.project.projectDir, extension.inputDir.get())
 				val version = extension.version.get()

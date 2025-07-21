@@ -10,10 +10,10 @@ class Helm : Plugin<Project> {
 	override fun apply(project: Project) {
 		val extension = project.extensions.create<HemlExtension>(className)
 
-		project.task(className) {
+		project.tasks.register(className) {
 			this.group = "buildSrc"
 			this.description = "Set Heml version."
-			doLast {
+			this.doLast {
 				val version = extension.version.get()
 				val helmFile = File(project.rootDir, "helm")
 				val envFile = File(project.rootDir, ".env")

@@ -1,3 +1,9 @@
+import java.util.Properties
+import kotlin.apply
+
+val properties = Properties().apply { load(rootProject.file("project.properties").inputStream()) }
+val kf = properties.getProperty("kotlin-faker")
+
 plugins {
     id("buildSrc.common")
     id("buildSrc.logging")
@@ -5,7 +11,10 @@ plugins {
     id("buildSrc.security")
 }
 
+kotlin {
+    explicitApi()
+}
+
 dependencies {
-    // Apply the kotlinx bundle of dependencies from the version catalog (`gradle/libs.versions.toml`).
-    testImplementation(kotlin("test"))
+    implementation("io.github.serpro69:kotlin-faker:$kf")
 }

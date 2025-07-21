@@ -15,31 +15,16 @@ plugins {
 }
 kotlin {
     jvmToolchain(jdk)
+    compilerOptions.optIn.addAll(
+        "kotlin.uuid.ExperimentalUuidApi",
+        "kotlin.io.encoding.ExperimentalEncodingApi"
+    )
 }
 repositories {
     mavenCentral()
 }
 testlogger {
     this.setTheme("mocha")
-}
-tasks.dokkaHtml {
-    dokkaSourceSets {
-        configureEach {
-            documentedVisibilities.set(
-                setOf(
-                    org.jetbrains.dokka.DokkaConfiguration.Visibility.PUBLIC, // Same for both Kotlin and Java
-                    org.jetbrains.dokka.DokkaConfiguration.Visibility.PRIVATE, // Same for both Kotlin and Java
-                    org.jetbrains.dokka.DokkaConfiguration.Visibility.PROTECTED, // Same for both Kotlin and Java
-                    org.jetbrains.dokka.DokkaConfiguration.Visibility.INTERNAL, // Kotlin-specific internal modifier
-                    org.jetbrains.dokka.DokkaConfiguration.Visibility.PACKAGE, // Java-specific package-private visibility
-                ),
-            )
-            includeNonPublic.set(true)
-            jdkVersion.set(jdk)
-            reportUndocumented.set(true)
-            skipEmptyPackages.set(false)
-        }
-    }
 }
 
 dependencies {

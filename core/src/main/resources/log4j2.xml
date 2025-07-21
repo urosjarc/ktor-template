@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration scan="true">
+
+	<Appenders>
+
+		<Console name="Console"
+				 target="SYSTEM_OUT">
+			<PatternLayout pattern="%d{yyyy.MM.dd HH:mm:ss.SSS} %40file:%-3line | %-5level | %msg%n"/>
+		</Console>
+
+		<Async name="Async-Console"
+			   ignoreExceptions="false"
+			   includeLocation="true">
+			<AppenderRef ref="Console"/>
+		</Async>
+
+	</Appenders>
+
+	<Loggers>
+		<Root includeLocation="true" level="TRACE">
+			<AppenderRef level="trace" ref="Async-Console"/>
+		</Root>
+	</Loggers>
+</Configuration>
