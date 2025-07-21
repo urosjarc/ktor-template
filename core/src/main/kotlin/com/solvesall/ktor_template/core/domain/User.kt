@@ -4,7 +4,9 @@ import com.solvesall.ktor_template.core.types.Encrypted
 import com.solvesall.ktor_template.core.types.Hashed
 import com.solvesall.ktor_template.core.types.Id
 import com.solvesall.ktor_template.core.types.TimeZoned
+import kotlinx.serialization.Serializable
 
+@Serializable
 public data class User(
     val id: Id<User> = Id(),
     val username: String,

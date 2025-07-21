@@ -1,11 +1,6 @@
 package com.solvesall.ktor_template.core.extend
 
-import com.solvesall.ktor_template.core.domain.User
-import com.solvesall.ktor_template.core.types.Encrypted
-import com.solvesall.ktor_template.core.types.Hashed
-import com.solvesall.ktor_template.core.types.TimeZoned
-import com.solvesall.ktor_template.core.types.encrypted
-import com.solvesall.ktor_template.core.types.hashed
+import com.solvesall.ktor_template.core.types.*
 import io.github.serpro69.kfaker.Faker
 import io.github.serpro69.kfaker.fakerConfig
 import kotlin.uuid.Uuid
@@ -24,8 +19,4 @@ public inline fun <reified T : Any> Faker.random(): T = faker.randomProvider.ran
     typeGenerator<Hashed> { "${it.name}_$value".hashed() }
     typeGenerator<TimeZoned> { TimeZoned.nowUtc() }
     typeGenerator<String> { "${it.name}_$value" }
-}
-
-public fun main() {
-    println(faker.random<User>())
 }
