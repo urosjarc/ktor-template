@@ -8,20 +8,25 @@ import com.solvesall.ktor_template.core.types.Id
 import com.solvesall.ktor_template.core.types.TimeZoned
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EntityManager
+import jakarta.persistence.EntityManagerFactory
+import jakarta.persistence.EntityTransaction
 import jakarta.persistence.Table
 import jakarta.persistence.Id as ID
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.stereotype.Repository
-import org.springframework.stereotype.Service
+import org.apache.logging.log4j.kotlin.logger
+import org.hibernate.annotations.NamedQuery
+import org.hibernate.annotations.processing.CheckHQL
 import java.time.ZonedDateTime
-import kotlin.uuid.Uuid
+import java.util.UUID
+import kotlin.uuid.toJavaUuid
+import kotlin.uuid.toKotlinUuid
 
-
+@CheckHQL
+@NamedQuery(name = "findBooksByTitle", query = "from UserTable where username LIKE 'test'")
 @Entity
 @Table(name = "users")
 private data class UserTable(
-    @ID val id: Uuid,
+    @ID val id: UUID,
     @Column val username: String,
     @Column val password: String,
     @Column val email: String,
@@ -32,30 +37,19 @@ private data class UserTable(
 ) {
     val domain
         get(): User = User(
-            id = Id(this.id),
+            id = Id(this.id.toKotlinUuid()),
             username = this.username,
             password = Hashed(this.password.toByteArray()),
             email = Encrypted(this.email.toByteArray()),
             phone = Encrypted(this.phone.toByteArray()),
             address = Encrypted(this.address.toByteArray()),
-            createdAt = TimeZoned(value=this.createdAt),
-            updatedAt = TimeZoned(value=this.updatedAt),
+            createdAt = TimeZoned(value = this.createdAt),
+            updatedAt = TimeZoned(value = this.updatedAt),
         )
-}
 
-@Repository
-private interface UserRepository : JpaRepository<UserTable?, Id<User>?> {
-}
-
-@Service
-internal class UserHRepo : UserRepo {
-
-    @Autowired
-    private lateinit var repo: UserRepository
-
-    override fun create(obj: User): User? {
-        val table = UserTable(
-            id = obj.id.value,
+    companion object {
+        fun row(obj: User): UserTable = UserTable(
+            id = obj.id.value.toJavaUuid(),
             username = obj.username,
             password = String(obj.password.value),
             email = String(obj.email.value),
@@ -64,22 +58,75 @@ internal class UserHRepo : UserRepo {
             createdAt = obj.createdAt.value,
             updatedAt = obj.updatedAt.value
         )
-        return repo.save(table).domain
+    }
+}
 
+public class UserHRepo(private val emf: EntityManagerFactory) : UserRepo {
+    private val logger = logger()
+
+    private inline fun <T> withTransaction(crossinline block: (EntityManager) -> T): T? {
+        val em = emf.createEntityManager()
+        val tx: EntityTransaction = em.transaction
+
+        return try {
+            tx.begin()
+            val result = block(em)
+            tx.commit()
+            result
+        } catch (e: Exception) {
+            logger.error("Transaction failed", e)
+            if (tx.isActive) {
+                tx.rollback()
+            }
+            null
+        } finally {
+            em.close()
+        }
     }
 
-    override fun select(): List<User> = repo.findAll().mapNotNull { it!!.domain }
+    override fun create(obj: User): User? {
+        logger.info("Creating user: ${obj.username}")
+        return withTransaction { em ->
+            val userTable = UserTable.row(obj)
+            em.persist(userTable)
+            userTable.domain
+        }
+    }
 
-    override fun select(id: Id<User>): User? = repo.findById(id).orElse(null)?.domain
+    override fun select(): List<User> {
+        logger.info("Selecting all users")
+        return withTransaction { em ->
+            em.createQuery("SELECT u FROM UserTable u", UserTable::class.java)
+                .resultList
+                .map { it.domain }
+        } ?: emptyList()
+    }
 
+    override fun select(id: Id<User>): User? {
+        logger.info("Selecting user by id: ${id.value}")
+        return withTransaction { em ->
+            em.find(UserTable::class.java, id.value.toJavaUuid())?.domain
+        }
+    }
 
     override fun update(obj: User): User? {
-        TODO("Not yet implemented")
+        logger.info("Updating user: ${obj.username}")
+        return withTransaction { em ->
+            val userTable = UserTable.row(obj)
+            em.merge(userTable).domain
+        }
     }
 
     override fun delete(id: Id<User>): User? {
-        TODO("Not yet implemented")
+        logger.info("Deleting user by id: ${id.value}")
+        return withTransaction { em ->
+            val userTable = em.find(UserTable::class.java, id.value.toJavaUuid())
+            if (userTable != null) {
+                em.remove(userTable)
+                userTable.domain
+            } else {
+                null
+            }
+        }
     }
-
-
 }

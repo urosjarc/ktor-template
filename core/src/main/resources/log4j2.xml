@@ -5,7 +5,7 @@
 
 		<Console name="Console"
 				 target="SYSTEM_OUT">
-			<PatternLayout pattern="%d{yyyy.MM.dd HH:mm:ss.SSS} %40file:%-3line | %-5level | %msg%n"/>
+			<PatternLayout pattern="%d{yyyy.MM.dd HH:mm:ss.SSS} %40c:%-3line | %-5level | %msg%n"/>
 		</Console>
 
 		<Async name="Async-Console"
@@ -20,5 +20,8 @@
 		<Root includeLocation="true" level="TRACE">
 			<AppenderRef level="trace" ref="Async-Console"/>
 		</Root>
+		<Logger name="org.hibernate" level="INFO"/>
+		<logger name="org.hibernate.SQL" level="DEBUG"/>
+		<logger name="org.jboss.logging" level="INFO"/>
 	</Loggers>
 </Configuration>
