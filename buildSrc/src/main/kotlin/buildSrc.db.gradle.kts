@@ -1,19 +1,30 @@
 plugins {
 	kotlin("jvm")
+	kotlin("plugin.spring")
+	kotlin("plugin.jpa")
+	id("org.springframework.boot")
+	id("io.spring.dependency-management")
 }
 
+kotlin {
+	compilerOptions {
+		freeCompilerArgs.addAll("-Xjsr305=strict")
+	}
+}
+
+allOpen {
+	annotation("jakarta.persistence.Entity")
+	annotation("jakarta.persistence.MappedSuperclass")
+	annotation("jakarta.persistence.Embeddable")
+}
 
 dependencies {
-	implementation("com.zaxxer:HikariCP:5.1.0")
+	implementation("org.springframework.boot:spring-boot-starter-data-jpa:3.5.3")
+	implementation("org.jetbrains.kotlin:kotlin-reflect:2.2.0")
+	implementation("org.liquibase:liquibase-core:4.33.0")
 
-	val exposedVersion = "0.49.0"
-	implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
-	implementation("org.jetbrains.exposed:exposed-dao:$exposedVersion")
-	implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
-	implementation("org.jetbrains.exposed:exposed-kotlin-datetime:$exposedVersion")
+	runtimeOnly("com.h2database:h2:2.3.232")
+	runtimeOnly("org.postgresql:postgresql:42.7.7")
 
-	val postgresqlVersion = "42.7.3"
-	implementation("org.postgresql:postgresql:$postgresqlVersion")
-
-	testImplementation("org.xerial:sqlite-jdbc:3.45.3.0")
+	testImplementation("org.springframework.boot:spring-boot-starter-test:3.5.3")
 }

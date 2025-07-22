@@ -10,16 +10,21 @@ import java.time.format.DateTimeParseException
 
 @JvmInline
 @Serializable(TimeZonedSerializer::class)
-public value class TimeZoned(private val value: ZonedDateTime) {
+public value class TimeZoned(public val value: ZonedDateTime) {
 
 	public val zonedDateTime: ZonedDateTime get() = this.value
 	public val zone: ZoneId get() = this.value.zone
 
 	public companion object {
+
+		public val SLOVENIA: ZoneId = ZoneId.of("Europe/Ljubljana")
+		public val LATVIA: ZoneId = ZoneId.of("Europe/Riga")
+		public val UTC: ZoneId = ZoneId.of("UTC")
+
 		public fun nowSystem(): TimeZoned = TimeZoned(ZonedDateTime.now())
-		public fun nowSlovenia(): TimeZoned = TimeZoned(ZonedDateTime.now(TimeZone.SLOVENIA))
-		public fun nowLatvia(): TimeZoned = TimeZoned(ZonedDateTime.now(TimeZone.LATVIA))
-		public fun nowUtc(): TimeZoned = TimeZoned(ZonedDateTime.now(TimeZone.UTC))
+		public fun nowSlovenia(): TimeZoned = TimeZoned(ZonedDateTime.now(SLOVENIA))
+		public fun nowLatvia(): TimeZoned = TimeZoned(ZonedDateTime.now(LATVIA))
+		public fun nowUtc(): TimeZoned = TimeZoned(ZonedDateTime.now(UTC))
 
 		public fun fromEpochMiliseconds(timestamp: Long, atZone: ZoneId): TimeZoned {
 			val instant = Instant.ofEpochMilli(timestamp)
@@ -53,11 +58,11 @@ public value class TimeZoned(private val value: ZonedDateTime) {
 	}
 
 	public fun toSlovenianTimezone(): TimeZoned {
-		return this.toZone(TimeZone.SLOVENIA)
+		return this.toZone(SLOVENIA)
 	}
 
 	public fun toUtcTimezone(): TimeZoned {
-		return this.toZone(TimeZone.UTC)
+		return this.toZone(UTC)
 	}
 
 	public fun toString(withTimeZone: Boolean): String {

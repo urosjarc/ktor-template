@@ -8,7 +8,7 @@ import kotlin.uuid.Uuid
 public val faker: Faker = Faker(fakerConfig { randomSeed = 0 })
 public val fakerCounter: MutableMap<String, Long> = mutableMapOf()
 
-public inline fun <reified T : Any> Faker.random(): T = faker.randomProvider.randomClassInstance {
+public inline fun <reified T : Any> Faker.ext_random(): T = faker.randomProvider.randomClassInstance {
     val key = T::class.qualifiedName.toString()
     val value = fakerCounter.getOrDefault(key, 0) + 1
     fakerCounter[key] = value

@@ -22,6 +22,7 @@ dependencies {
     implementation("io.ktor:ktor-server-sse:$ktor")
     implementation("io.ktor:ktor-server-content-negotiation:$ktor")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor")
+    implementation("io.ktor:ktor-server-compression:$ktor")
     implementation("io.ktor:ktor-server-call-id:$ktor")
     implementation("io.ktor:ktor-server-call-logging:$ktor")
     implementation("io.ktor:ktor-server-metrics-micrometer:$ktor")

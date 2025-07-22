@@ -1,5 +1,8 @@
 package com.solvesall.ktor_template.core.types
 
+import com.solvesall.ktor_template.core.types.TimeZoned.Companion.LATVIA
+import com.solvesall.ktor_template.core.types.TimeZoned.Companion.SLOVENIA
+import com.solvesall.ktor_template.core.types.TimeZoned.Companion.UTC
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -21,25 +24,25 @@ class TimeZonedTest {
     @Test
     fun `test nowSlovenia creates TimeZoned with Slovenia timezone`() {
         val timeZoned = TimeZoned.nowSlovenia()
-        assertEquals(TimeZone.SLOVENIA, timeZoned.zone)
+        assertEquals(SLOVENIA, timeZoned.zone)
     }
 
     @Test
     fun `test nowLatvia creates TimeZoned with Latvia timezone`() {
         val timeZoned = TimeZoned.nowLatvia()
-        assertEquals(TimeZone.LATVIA, timeZoned.zone)
+        assertEquals(LATVIA, timeZoned.zone)
     }
 
     @Test
     fun `test nowUtc creates TimeZoned with UTC timezone`() {
         val timeZoned = TimeZoned.nowUtc()
-        assertEquals(TimeZone.UTC, timeZoned.zone)
+        assertEquals(UTC, timeZoned.zone)
     }
 
     @Test
     fun `test fromEpochMiliseconds creates TimeZoned with correct time and zone`() {
         val timestamp = 1626859200000L // 2021-07-21T12:00:00Z
-        val zone = TimeZone.UTC
+        val zone = UTC
         val timeZoned = TimeZoned.fromEpochMiliseconds(timestamp, zone)
 
         assertEquals(zone, timeZoned.zone)
@@ -49,7 +52,7 @@ class TimeZonedTest {
     @Test
     fun `test fromEpochSeconds creates TimeZoned with correct time and zone`() {
         val timestamp = 1626859200L // 2021-07-21T12:00:00Z
-        val zone = TimeZone.UTC
+        val zone = UTC
         val timeZoned = TimeZoned.fromEpochSeconds(timestamp, zone)
 
         assertEquals(zone, timeZoned.zone)
@@ -76,7 +79,7 @@ class TimeZonedTest {
     @Test
     fun `test parseLocalDateTime valid string returns TimeZoned`() {
         val dateTimeString = "2021-07-21T12:00:00"
-        val zone = TimeZone.UTC
+        val zone = UTC
         val timeZoned = TimeZoned.parseLocalDateTime(dateTimeString, zone)
 
         assertNotNull(timeZoned)
@@ -86,7 +89,7 @@ class TimeZonedTest {
     @Test
     fun `test parseLocalDateTime invalid string returns null`() {
         val invalidString = "not-a-date-time"
-        val zone = TimeZone.UTC
+        val zone = UTC
         val timeZoned = TimeZoned.parseLocalDateTime(invalidString, zone)
 
         assertNull(timeZoned)
@@ -95,9 +98,9 @@ class TimeZonedTest {
     @Test
     fun `test toZone converts to specified timezone`() {
         val original = TimeZoned.nowUtc()
-        val converted = original.toZone(TimeZone.SLOVENIA)
+        val converted = original.toZone(SLOVENIA)
 
-        assertEquals(TimeZone.SLOVENIA, converted.zone)
+        assertEquals(SLOVENIA, converted.zone)
         assertEquals(original.zonedDateTime.toInstant(), converted.zonedDateTime.toInstant())
     }
 
@@ -106,7 +109,7 @@ class TimeZonedTest {
         val original = TimeZoned.nowUtc()
         val converted = original.toSlovenianTimezone()
 
-        assertEquals(TimeZone.SLOVENIA, converted.zone)
+        assertEquals(SLOVENIA, converted.zone)
         assertEquals(original.zonedDateTime.toInstant(), converted.zonedDateTime.toInstant())
     }
 
@@ -115,7 +118,7 @@ class TimeZonedTest {
         val original = TimeZoned.nowSlovenia()
         val converted = original.toUtcTimezone()
 
-        assertEquals(TimeZone.UTC, converted.zone)
+        assertEquals(UTC, converted.zone)
         assertEquals(original.zonedDateTime.toInstant(), converted.zonedDateTime.toInstant())
     }
 

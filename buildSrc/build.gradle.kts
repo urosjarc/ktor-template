@@ -7,6 +7,8 @@ val jdk = properties.getProperty("jdk").toInt()
 val kgp = properties.getProperty("kover-gradle-plugin")
 val dokka = properties.getProperty("dokka")
 val gtlv = properties.getProperty("gradle-test-logger-plugin")
+val osb = properties.getProperty("org.springframework.boot")
+val isdm = properties.getProperty("io.spring.dependency-management")
 
 plugins {
     // The Kotlin DSL plugin provides a convenient way to develop convention plugins.
@@ -31,4 +33,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kover-gradle-plugin:$kgp")
     implementation("org.jetbrains.dokka:dokka-gradle-plugin:$dokka")
     implementation("com.adarshr:gradle-test-logger-plugin:$gtlv")
+
+    implementation("org.jetbrains.kotlin.plugin.spring:org.jetbrains.kotlin.plugin.spring.gradle.plugin:$kotlin")
+    implementation("org.jetbrains.kotlin.plugin.jpa:org.jetbrains.kotlin.plugin.jpa.gradle.plugin:$kotlin")
+    implementation("io.spring.dependency-management:io.spring.dependency-management.gradle.plugin:$isdm")
+    implementation("org.springframework.boot:org.springframework.boot.gradle.plugin:$osb")
 }

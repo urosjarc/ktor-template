@@ -13,5 +13,5 @@ plugins {
 dependencies {
     implementation("org.apache.logging.log4j:log4j-api-kotlin:$lak")
 //    implementation("org.apache.logging.log4j:log4j-slf4j-impl:$lsi")
-    implementation("org.apache.logging.log4j:log4j-slf4j2-impl:$ls2i")
+    runtimeOnly("org.apache.logging.log4j:log4j-slf4j2-impl:$ls2i")
 }

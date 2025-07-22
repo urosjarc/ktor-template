@@ -2,7 +2,7 @@ package com.solvesall.ktor_template.core.services
 
 import com.solvesall.ktor_template.core.domain.User
 import com.solvesall.ktor_template.core.extend.faker
-import com.solvesall.ktor_template.core.extend.random
+import com.solvesall.ktor_template.core.extend.ext_random
 import com.solvesall.ktor_template.core.types.Id
 import com.solvesall.ktor_template.core.types.TimeZoned
 import com.solvesall.ktor_template.core.types.encrypted
@@ -101,11 +101,11 @@ class JsonServiceTest {
         // Arrange - using faker to generate random User
         val user = User(
             id = Id(),
-            username = faker.random(),
-            password = faker.random<String>().hashed(),
-            email = faker.random<String>().encrypted(),
-            phone = faker.random<String>().encrypted(),
-            address = faker.random<String>().encrypted(),
+            username = faker.ext_random(),
+            password = faker.ext_random<String>().hashed(),
+            email = faker.ext_random<String>().encrypted(),
+            phone = faker.ext_random<String>().encrypted(),
+            address = faker.ext_random<String>().encrypted(),
             createdAt = TimeZoned.nowUtc(),
             updatedAt = TimeZoned.nowUtc()
         )
