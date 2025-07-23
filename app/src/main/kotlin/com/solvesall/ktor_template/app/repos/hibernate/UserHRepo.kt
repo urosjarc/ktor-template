@@ -18,7 +18,7 @@ import kotlin.uuid.toJavaUuid
 import kotlin.uuid.toKotlinUuid
 import jakarta.persistence.Id as ID
 
-internal const val select_user_by_username = "from UserTable u WHERE u.username = :username"
+private const val select_user_by_username = "from UserTable u WHERE u.username = :username"
 
 @CheckHQL
 @NamedQuery(name="select_user_by_username", query=select_user_by_username)
