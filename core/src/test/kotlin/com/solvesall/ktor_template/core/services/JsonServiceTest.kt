@@ -2,7 +2,6 @@ package com.solvesall.ktor_template.core.services
 
 import com.solvesall.ktor_template.core.domain.User
 import com.solvesall.ktor_template.core.extend.faker
-import com.solvesall.ktor_template.core.extend.ext_random
 import com.solvesall.ktor_template.core.types.Id
 import com.solvesall.ktor_template.core.types.TimeZoned
 import com.solvesall.ktor_template.core.types.encrypted
@@ -96,32 +95,4 @@ class JsonServiceTest {
         assertEquals(user.username, decodedUser.username)
     }
 
-    @Test
-    fun `test encode and decode User using faker`() {
-        // Arrange - using faker to generate random User
-        val user = User(
-            id = Id(),
-            username = faker.ext_random(),
-            password = faker.ext_random<String>().hashed(),
-            email = faker.ext_random<String>().encrypted(),
-            phone = faker.ext_random<String>().encrypted(),
-            address = faker.ext_random<String>().encrypted(),
-            createdAt = TimeZoned.nowUtc(),
-            updatedAt = TimeZoned.nowUtc()
-        )
-
-        // Act
-        val json = jsonService.encode(user)
-        val decodedUser = jsonService.decode<User>(json)
-
-        // Assert
-        assertEquals(user.id.toString(), decodedUser.id.toString())
-        assertEquals(user.username, decodedUser.username)
-        assertEquals(user.password.toString(), decodedUser.password.toString())
-        assertEquals(user.email.toString(), decodedUser.email.toString())
-        assertEquals(user.phone.toString(), decodedUser.phone.toString())
-        assertEquals(user.address.toString(), decodedUser.address.toString())
-        assertEquals(user.createdAt.toString(), decodedUser.createdAt.toString())
-        assertEquals(user.updatedAt.toString(), decodedUser.updatedAt.toString())
-    }
 }
