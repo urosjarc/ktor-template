@@ -8,8 +8,8 @@ import com.solvesall.ktor_template.core.types.Id
 import com.solvesall.ktor_template.core.types.TimeZoned
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
-import jakarta.persistence.EntityManagerFactory
 import jakarta.persistence.Table
+import org.hibernate.StatelessSession
 import org.hibernate.annotations.NamedQuery
 import org.hibernate.annotations.processing.CheckHQL
 import java.time.ZonedDateTime
@@ -18,10 +18,12 @@ import kotlin.uuid.toJavaUuid
 import kotlin.uuid.toKotlinUuid
 import jakarta.persistence.Id as ID
 
-private const val select_user_by_username = "from UserTable u WHERE u.username = :username"
+private object HQL {
+    const val select_user_by_username = "1"
+}
 
 @CheckHQL
-@NamedQuery(name="select_user_by_username", query=select_user_by_username)
+@NamedQuery(name = HQL.select_user_by_username, query = "from UserTable u WHERE u.username = :username")
 @Entity
 @Table(name = "users")
 public data class UserTable(
@@ -47,7 +49,7 @@ public data class UserTable(
         )
 }
 
-internal class UserHRepo(emf: EntityManagerFactory) : HRepo<UserTable, User>(emf, UserTable::class.java), UserRepo {
+internal class UserHRepo(session: StatelessSession) : HRepo<UserTable, User>(session, UserTable::class.java), UserRepo {
 
     override fun toRow(obj: User): UserTable = UserTable(
         id = obj.id.value.toJavaUuid(),
@@ -60,11 +62,8 @@ internal class UserHRepo(emf: EntityManagerFactory) : HRepo<UserTable, User>(emf
         updatedAt = obj.updatedAt.value
     )
 
-    override fun selectByUsername(username: String): User? {
-        return this.withTransaction { em ->
-            em.createNamedQuery(::select_user_by_username.name, UserTable::class.java)
-                .setParameter("username", username)
-                .resultList.firstOrNull()?.domain
-        }
-    }
+    override fun selectByUsername(username: String): User? =
+        session.createNamedQuery(HQL.select_user_by_username, UserTable::class.java)
+            .setParameter("username", username)
+            .resultList.firstOrNull()?.domain
 }

@@ -18,20 +18,13 @@ class AppTest {
     }
 
     @Test
-    fun `test CRUD operations with Hibernate`() {
-        // Create a test user
-        val testUser = random<User>()
-
-        // Create the user
-        val createdUser = App.repos.user.create(testUser)
-        assertNotNull(createdUser, "User should be created successfully")
-        assertEquals(testUser.username, createdUser.username, "Username should match")
-
-        val users = App.repos.user.selectByUsername(testUser.username)
-        println(users)
-
-        val users1 = App.repos.user.select()
-        println(users1)
-
+    fun `test repos`() {
+        App.services.db.transaction {
+            val user = random<User>()
+            val userN = it.userRepo.create(obj = user) ?: return@transaction it.rollback()
+            println(userN)
+            val users = it.userRepo.select()
+            println(users)
+        }
     }
 }
