@@ -18,8 +18,10 @@ import kotlin.uuid.toJavaUuid
 import kotlin.uuid.toKotlinUuid
 import jakarta.persistence.Id as ID
 
+internal const val select_user_by_username = "from UserTable u WHERE u.username = :username"
+
 @CheckHQL
-@NamedQuery(name="select_user_by_username", query="from UserTable u WHERE u.username = :username")
+@NamedQuery(name="select_user_by_username", query=select_user_by_username)
 @Entity
 @Table(name = "users")
 public data class UserTable(
@@ -60,7 +62,7 @@ internal class UserHRepo(emf: EntityManagerFactory) : HRepo<UserTable, User>(emf
 
     override fun selectByUsername(username: String): User? {
         return this.withTransaction { em ->
-            em.createNamedQuery("select_user_by_username", UserTable::class.java)
+            em.createNamedQuery(::select_user_by_username.name, UserTable::class.java)
                 .setParameter("username", username)
                 .resultList.firstOrNull()?.domain
         }
