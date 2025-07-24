@@ -22,6 +22,7 @@
 		</Root>
 		<Logger name="org.hibernate" level="INFO"/>
 		<logger name="org.hibernate.SQL" level="DEBUG"/>
+		<logger name="org.hibernate.stat" level="TRACE"/>
 		<logger name="org.jboss.logging" level="INFO"/>
 	</Loggers>
 </Configuration>

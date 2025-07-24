@@ -30,7 +30,7 @@ public object App {
         config.setProperty("hibernate.format_sql", true)
         config.setProperty("spring.jpa.properties.hibernate.check_nullability", true)
         config.setProperty("hibernate.connection.isolation", Connection.TRANSACTION_READ_UNCOMMITTED)
-
+        config.setProperty("hibernate.generate_statistics", true)
         if(false){
             config.setProperty("hibernate.connection.driver_class", "org.h2.Driver")
             config.setProperty("hibernate.connection.url", "jdbc:h2:mem:database.h2;DB_CLOSE_DELAY=-1")

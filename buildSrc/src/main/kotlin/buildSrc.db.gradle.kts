@@ -27,6 +27,4 @@ dependencies {
 	// Sqlite Database
 	implementation("org.hibernate.orm:hibernate-community-dialects:7.0.7.Final")
 	runtimeOnly("org.xerial:sqlite-jdbc:3.25.2")
-
-
 }
