@@ -11,9 +11,12 @@ import org.hibernate.boot.registry.StandardServiceRegistryBuilder
 import org.hibernate.cfg.Configuration
 import kotlin.system.measureTimeMillis
 import kotlin.time.Duration
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 public class HibernateDbService(config: Configuration) : DbService {
     internal val sessionFactory: SessionFactory
+    private val sessionStats = mutableMapOf<String, DbService.TransactionStats>()
 
     init {
         config.addAnnotatedClasses(
@@ -46,10 +49,12 @@ public class HibernateDbService(config: Configuration) : DbService {
         }
     }
 
+    override val stats: List<DbService.TransactionStats> get() = this.sessionStats.values.toList()
 
-    override fun <T> transaction(block: (DbService.Transaction) -> T?): T? {
+    override fun <T> transaction(name: String, block: (DbService.Transaction) -> T?): T? {
         val session = sessionFactory.openStatelessSession()
         val tx: Transaction = session.transaction
+        val txStats = this.sessionStats.getOrDefault(name, DbService.TransactionStats(name = name))
 
         val repos = HRepos(session, tx)
 
@@ -59,8 +64,11 @@ public class HibernateDbService(config: Configuration) : DbService {
             val runTime = measureTimeMillis { result = block(repos) }
             logger.debug("Transaction finished: ${runTime}ms")
             tx.commit()
+            txStats.durations.add(runTime.toDuration(DurationUnit.MILLISECONDS))
+            txStats.completed++
             result
         } catch (e: Exception) {
+            txStats.failed++
             logger.error("Transaction failed", e)
             if (tx.isActive) {
                 tx.rollback()
