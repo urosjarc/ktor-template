@@ -19,12 +19,23 @@ class AppTest {
 
     @Test
     fun `test repos`() {
+        var user = random<User>()
         App.services.db.transaction {
-            val user = random<User>()
-            val userN = it.userRepo.create(obj = user) ?: return@transaction it.rollback()
-            println(userN)
-            val users = it.userRepo.select()
-            println(users)
+            it.repos.user.create(obj = user) ?: return@transaction it.rollback()
+            it.repos.user.select()
+        }
+        user = random<User>()
+        App.services.db.transaction {
+            it.repos.user.create(obj = user) ?: return@transaction it.rollback()
+            it.repos.user.select()
+        }
+        user = random<User>()
+        App.services.db.transaction {
+            it.repos.user.create(obj = user) ?: return@transaction it.rollback()
+        }
+        user = random<User>()
+        App.services.db.transaction {
+            it.repos.user.select()
         }
     }
 }

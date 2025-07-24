@@ -25,7 +25,9 @@ internal abstract class HRepo<T, D>(val session: StatelessSession, val kclass: C
 
     override fun select(): List<D> {
         val query = session.createQuery("SELECT T FROM ${kclass.simpleName} T", kclass)
-        return query.resultList.map { it as HTable<D> }.map { it.domain }
+        val resultList = query.resultList
+        val domain = resultList.map { (it as HTable<D>).domain }
+        return domain
     }
 
     override fun select(id: Id<D>): D? {
