@@ -17,7 +17,7 @@ import kotlin.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
 
-public class HibernateDbService(config: Configuration) : DbService {
+public class HibernateDbService(private val statsSize: Long, config: Configuration) : DbService {
     internal val sessionFactory: SessionFactory
 
     private val txStatsMutex = Mutex(locked = false)
@@ -84,6 +84,7 @@ public class HibernateDbService(config: Configuration) : DbService {
                 txStats.getOrDefault(name, mutableListOf()).apply {
                     val duration = runTime?.toDuration(DurationUnit.MILLISECONDS)
                     this.add(DbService.TransactionStat(error = error, created = TimeZoned.nowSystem(), duration = duration))
+                    if(this.size > statsSize) this.removeFirst()
                 }
             }
         }

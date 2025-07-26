@@ -39,7 +39,7 @@ public object App {
             config.setProperty("hibernate.connection.url", "jdbc:sqlite:memory:database.sqlite3")
         }
 
-        services.db = HibernateDbService(config = config)
+        services.db = HibernateDbService(statsSize = 100_000, config = config)
 
 
     }
