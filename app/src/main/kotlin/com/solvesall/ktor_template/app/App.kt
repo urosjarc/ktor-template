@@ -11,7 +11,7 @@ import kotlin.concurrent.atomics.AtomicBoolean
 
 public object App {
 
-    private var finished: AtomicBoolean = AtomicBoolean(false)
+    private var inited: AtomicBoolean = AtomicBoolean(false)
     private var initMutex: Mutex = Mutex(locked = false)
 
     public object services {
@@ -23,7 +23,7 @@ public object App {
     }
 
     public suspend fun init(): Unit = this.initMutex.withLock {
-        if (this.finished.load()) {
+        if (this.inited.load()) {
             logger.info("App.init() already finished")
             return
         }
@@ -47,7 +47,7 @@ public object App {
 
         services.db = HibernateDbService(statsSize = 100_000, config = config)
 
-        this.finished.store(true)
+        this.inited.store(true)
         logger.info("App.init() finished")
     }
 }
