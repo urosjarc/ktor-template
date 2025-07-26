@@ -2,13 +2,17 @@ package com.solvesall.ktor_template.app
 
 import com.solvesall.ktor_template.app.services.HibernateDbService
 import com.solvesall.ktor_template.core.services.DbService
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.apache.logging.log4j.kotlin.logger
 import org.hibernate.cfg.Configuration
 import java.sql.Connection
+import kotlin.concurrent.atomics.AtomicBoolean
 
 public object App {
 
-    private var inited: Boolean = false
+    private var finished: AtomicBoolean = AtomicBoolean(false)
+    private var initMutex: Mutex = Mutex(locked = false)
 
     public object services {
         public lateinit var db: DbService
@@ -18,9 +22,11 @@ public object App {
 
     }
 
-    public fun init(){
-        if(inited) return else inited = true
-
+    public suspend fun init(): Unit = this.initMutex.withLock {
+        if (this.finished.load()) {
+            logger.info("App.init() already finished")
+            return
+        }
         logger.info("App.init()")
 
         val config = Configuration()
@@ -31,7 +37,7 @@ public object App {
         config.setProperty("spring.jpa.properties.hibernate.check_nullability", true)
         config.setProperty("hibernate.connection.isolation", Connection.TRANSACTION_READ_UNCOMMITTED)
         config.setProperty("hibernate.generate_statistics", true)
-        if(false){
+        if (false) {
             config.setProperty("hibernate.connection.driver_class", "org.h2.Driver")
             config.setProperty("hibernate.connection.url", "jdbc:h2:mem:database.h2;DB_CLOSE_DELAY=-1")
         } else {
@@ -41,6 +47,7 @@ public object App {
 
         services.db = HibernateDbService(statsSize = 100_000, config = config)
 
-
+        this.finished.store(true)
+        logger.info("App.init() finished")
     }
 }

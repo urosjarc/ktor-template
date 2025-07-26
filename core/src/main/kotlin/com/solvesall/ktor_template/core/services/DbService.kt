@@ -6,6 +6,7 @@ import kotlin.time.Duration
 
 public interface DbService {
 	public data class TransactionStat(
+		val index: Long,
 		val duration: Duration?,
 		val created: TimeZoned,
 		val error: Boolean,

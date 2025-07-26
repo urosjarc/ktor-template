@@ -12,6 +12,7 @@ import org.hibernate.StatelessSession
 import org.hibernate.Transaction
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder
 import org.hibernate.cfg.Configuration
+import kotlin.concurrent.atomics.AtomicLong
 import kotlin.system.measureTimeMillis
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
@@ -22,6 +23,7 @@ public class HibernateDbService(private val statsSize: Long, config: Configurati
 
     private val txStatsMutex = Mutex(locked = false)
     private val txStats = mutableMapOf<String, MutableList<DbService.TransactionStat>>()
+    private var txStatsIndex = AtomicLong(0)
 
     init {
         config.addAnnotatedClasses(
@@ -63,12 +65,12 @@ public class HibernateDbService(private val statsSize: Long, config: Configurati
         val repos = HRepos(session, tx)
         var runTime: Long? = null
         var error = false
+        val txIndex = txStatsIndex.addAndFetch(1)
 
         return try {
             tx.begin()
             val result: T?
             runTime = measureTimeMillis { result = block(repos) }
-            logger.debug("Transaction finished: ${runTime}ms")
             tx.commit()
             result
         } catch (e: Exception) {
@@ -81,9 +83,9 @@ public class HibernateDbService(private val statsSize: Long, config: Configurati
         } finally {
             session.close()
             txStatsMutex.withLock {
-                txStats.getOrDefault(name, mutableListOf()).apply {
+                txStats[name] = txStats.getOrDefault(name, mutableListOf()).apply {
                     val duration = runTime?.toDuration(DurationUnit.MILLISECONDS)
-                    this.add(DbService.TransactionStat(error = error, created = TimeZoned.nowSystem(), duration = duration))
+                    this.add(DbService.TransactionStat(index = txIndex, error = error, created = TimeZoned.nowSystem(), duration = duration))
                     if(this.size > statsSize) this.removeFirst()
                 }
             }
