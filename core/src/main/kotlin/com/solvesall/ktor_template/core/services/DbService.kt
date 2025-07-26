@@ -1,14 +1,14 @@
 package com.solvesall.ktor_template.core.services
 
 import com.solvesall.ktor_template.core.repos.UserRepo
+import com.solvesall.ktor_template.core.types.TimeZoned
 import kotlin.time.Duration
 
 public interface DbService {
-	public data class TransactionStats(
-		val name: String,
-		val durations: MutableList<Duration> = mutableListOf(), //TODO: Make this fixed size list!!!
-		var completed: Long = 0,
-		var failed: Long = 0,
+	public data class TransactionStat(
+		val duration: Duration?,
+		val created: TimeZoned,
+		val error: Boolean,
 	)
 	public class Repos(
 		public val user: UserRepo
@@ -20,6 +20,6 @@ public interface DbService {
 		public fun timeout(duration: Duration)
 	}
 
-	public fun <T> transaction(name: String, block: (tx: Transaction) -> T?): T?
-	public val stats: List<TransactionStats>
+	public suspend fun <T> transaction(name: String, block: (tx: Transaction) -> T?): T?
+	public val stats: Map<String, List<TransactionStat>>
 }

@@ -3,6 +3,9 @@ package com.solvesall.ktor_template.app.services
 import com.solvesall.ktor_template.app.repos.hibernate.UserHRepo
 import com.solvesall.ktor_template.app.repos.hibernate.UserTable
 import com.solvesall.ktor_template.core.services.DbService
+import com.solvesall.ktor_template.core.types.TimeZoned
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.apache.logging.log4j.kotlin.logger
 import org.hibernate.SessionFactory
 import org.hibernate.StatelessSession
@@ -16,7 +19,9 @@ import kotlin.time.toDuration
 
 public class HibernateDbService(config: Configuration) : DbService {
     internal val sessionFactory: SessionFactory
-    private val sessionStats = mutableMapOf<String, DbService.TransactionStats>()
+
+    private val txStatsMutex = Mutex(locked = false)
+    private val txStats = mutableMapOf<String, MutableList<DbService.TransactionStat>>()
 
     init {
         config.addAnnotatedClasses(
@@ -49,26 +54,25 @@ public class HibernateDbService(config: Configuration) : DbService {
         }
     }
 
-    override val stats: List<DbService.TransactionStats> get() = this.sessionStats.values.toList()
+    override val stats: Map<String, List<DbService.TransactionStat>> get() = txStats.toMap()
 
-    override fun <T> transaction(name: String, block: (DbService.Transaction) -> T?): T? {
+    override suspend fun <T> transaction(name: String, block: (DbService.Transaction) -> T?): T? {
         val session = sessionFactory.openStatelessSession()
         val tx: Transaction = session.transaction
-        val txStats = this.sessionStats.getOrDefault(name, DbService.TransactionStats(name = name))
 
         val repos = HRepos(session, tx)
+        var runTime: Long? = null
+        var error = false
 
         return try {
             tx.begin()
             val result: T?
-            val runTime = measureTimeMillis { result = block(repos) }
+            runTime = measureTimeMillis { result = block(repos) }
             logger.debug("Transaction finished: ${runTime}ms")
             tx.commit()
-            txStats.durations.add(runTime.toDuration(DurationUnit.MILLISECONDS))
-            txStats.completed++
             result
         } catch (e: Exception) {
-            txStats.failed++
+            error = true
             logger.error("Transaction failed", e)
             if (tx.isActive) {
                 tx.rollback()
@@ -76,6 +80,12 @@ public class HibernateDbService(config: Configuration) : DbService {
             null
         } finally {
             session.close()
+            txStatsMutex.withLock {
+                txStats.getOrDefault(name, mutableListOf()).apply {
+                    val duration = runTime?.toDuration(DurationUnit.MILLISECONDS)
+                    this.add(DbService.TransactionStat(error = error, created = TimeZoned.nowSystem(), duration = duration))
+                }
+            }
         }
     }
 }

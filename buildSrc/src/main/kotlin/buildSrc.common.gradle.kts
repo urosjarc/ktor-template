@@ -17,7 +17,10 @@ kotlin {
     jvmToolchain(jdk)
     compilerOptions.optIn.addAll(
         "kotlin.uuid.ExperimentalUuidApi",
-        "kotlin.io.encoding.ExperimentalEncodingApi"
+        "kotlin.io.encoding.ExperimentalEncodingApi",
+        "kotlinx.coroutines.DelicateCoroutinesApi",
+        "kotlinx.coroutines.ExperimentalCoroutinesApi",
+        "kotlin.concurrent.atomics.ExperimentalAtomicApi"
     )
 }
 repositories {
@@ -28,6 +31,7 @@ testlogger {
 }
 
 dependencies {
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 }
 
