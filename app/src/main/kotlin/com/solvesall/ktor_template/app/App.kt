@@ -22,7 +22,7 @@ public object App {
 
     }
 
-    public suspend fun init(): Unit = this.initMutex.withLock {
+    public suspend fun init(inMemoryDb: Boolean = true): Unit = this.initMutex.withLock {
         if (this.inited.load()) {
             logger.info("App.init() already finished")
             return
@@ -37,7 +37,7 @@ public object App {
         config.setProperty("spring.jpa.properties.hibernate.check_nullability", true)
         config.setProperty("hibernate.connection.isolation", Connection.TRANSACTION_READ_UNCOMMITTED)
         config.setProperty("hibernate.generate_statistics", true)
-        if (false) {
+        if (inMemoryDb) {
             config.setProperty("hibernate.connection.driver_class", "org.h2.Driver")
             config.setProperty("hibernate.connection.url", "jdbc:h2:mem:database.h2;DB_CLOSE_DELAY=-1")
         } else {
