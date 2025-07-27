@@ -45,7 +45,7 @@ public object App {
             config.setProperty("hibernate.connection.url", "jdbc:sqlite:memory:database.sqlite3")
         }
 
-        services.db = HibernateDbService(statsSize = 100_000, config = config)
+        services.db = HibernateDbService(poolSize = 10, statsSize = 100_000, config = config)
 
         this.inited.store(true)
         logger.info("App.init() finished")

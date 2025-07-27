@@ -37,8 +37,8 @@ internal abstract class HRepo<T, D>(val session: StatelessSession, val kclass: C
 
     override fun update(obj: D): D? {
         val row = toRow(obj)
-        val merged = session.update(row) as HTable<D>
-        return merged.domain
+        val merged = session.update(row) as? HTable<D>
+        return merged?.domain
     }
 
     override fun delete(id: Id<D>): D? {
