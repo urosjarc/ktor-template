@@ -14,8 +14,7 @@ liquibase {
         val dbUser = System.getenv("DB_USER")
         val dbPassword = System.getenv("DB_PASSWORD")
         val dbDriver = System.getenv("DB_DRIVER")
-
-        this.arguments = mapOf(
+        val args = mapOf(
             "logLevel" to "info",
             "searchPath" to rootProject.file("data/db").absolutePath.toString(),
             "changelogFile" to "changelog.yml",
@@ -30,7 +29,16 @@ liquibase {
             "password" to dbPassword,
             "tag" to projectVersion
         )
-        println(this.arguments)
+
+
+        logger.lifecycle("")
+        logger.lifecycle("Liquibase arguments:")
+        args.forEach { (k, v) ->
+            logger.lifecycle(" - $k: $v")
+        }
+        logger.lifecycle("")
+
+        this.arguments = args
         runList = "main"
     }
 }
