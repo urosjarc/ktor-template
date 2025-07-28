@@ -19,6 +19,7 @@ liquibase {
             "logLevel" to "info",
             "searchPath" to rootProject.file("data/db").absolutePath.toString(),
             "changelogFile" to "changelog.yml",
+            "count" to 1,
             "driver" to dbDriver,
             "url" to dbUrl,
             "referenceDriver" to dbDriver,
