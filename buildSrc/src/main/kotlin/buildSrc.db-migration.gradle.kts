@@ -18,7 +18,7 @@ liquibase {
         this.arguments = mapOf(
             "logLevel" to "info",
             "searchPath" to rootProject.file("data/db").absolutePath.toString(),
-            "changelogFile" to "migrations.yml",
+            "changelogFile" to "changelog.yml",
             "driver" to dbDriver,
             "url" to dbUrl,
             "referenceDriver" to dbDriver,
