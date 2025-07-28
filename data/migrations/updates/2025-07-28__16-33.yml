@@ -1,7 +1,10 @@
 databaseChangeLog:
   - changeSet:
       id: 1
-      author: liquibase
+      author: Uros Jarc
+      labels:
+      context: example-context
+      comment: example-comment
       changes:
         - createTable:
             tableName: users
