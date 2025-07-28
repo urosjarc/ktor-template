@@ -14,6 +14,13 @@ public data class User(
     val email: Encrypted,
     val phone: Encrypted,
     val address: Encrypted,
+    val type: Type,
     val createdAt: TimeZoned = TimeZoned.nowUtc(),
     val updatedAt: TimeZoned = TimeZoned.nowUtc(),
-)
+) {
+
+    public enum class Type {
+        ADMIN,
+        CUSTOMER
+    }
+}

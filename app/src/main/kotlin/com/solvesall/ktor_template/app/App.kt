@@ -2,12 +2,14 @@ package com.solvesall.ktor_template.app
 
 import com.solvesall.ktor_template.app.services.HibernateDbService
 import com.solvesall.ktor_template.core.services.DbService
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.apache.logging.log4j.kotlin.logger
 import org.hibernate.cfg.Configuration
 import java.sql.Connection
 import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.time.Duration.Companion.seconds
 
 public object App {
 
@@ -27,7 +29,8 @@ public object App {
             logger.info("App.init() already finished")
             return
         }
-        logger.info("App.init()")
+        logger.info("App.init(PID=${Env.PID})")
+        delay(10.seconds)
 
         val config = Configuration()
         config.setProperty("hibernate.connection.username", Env.DB_USER)
@@ -43,8 +46,7 @@ public object App {
             // config.setProperty("hibernate.connection.driver_class", "org.sqlite.JDBC")
             // config.setProperty("hibernate.connection.url", "jdbc:sqlite:memory:database.sqlite3")
         } else {
-            // config.setProperty("hibernate.hbm2ddl.auto", "validate")
-            config.setProperty("hibernate.hbm2ddl.auto", "update")
+            config.setProperty("hibernate.hbm2ddl.auto", "validate")
             config.setProperty("hibernate.connection.driver_class", Env.DB_DRIVER)
             config.setProperty("hibernate.connection.url", Env.DB_URL)
         }

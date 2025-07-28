@@ -6,9 +6,7 @@ import com.solvesall.ktor_template.core.types.Encrypted
 import com.solvesall.ktor_template.core.types.Hashed
 import com.solvesall.ktor_template.core.types.Id
 import com.solvesall.ktor_template.core.types.TimeZoned
-import jakarta.persistence.Column
-import jakarta.persistence.Entity
-import jakarta.persistence.Table
+import jakarta.persistence.*
 import org.hibernate.StatelessSession
 import org.hibernate.annotations.NamedQuery
 import org.hibernate.annotations.processing.CheckHQL
@@ -33,6 +31,7 @@ public data class UserTable(
     @Column(unique = true) val email: String,
     @Column(unique = true) val phone: String,
     @Column val address: String,
+    @Column @Enumerated(EnumType.STRING) val type: User.Type,
     @Column val createdAt: ZonedDateTime,
     @Column val updatedAt: ZonedDateTime
 ) : HTable<User> {
@@ -44,6 +43,7 @@ public data class UserTable(
             email = Encrypted(this.email.toByteArray()),
             phone = Encrypted(this.phone.toByteArray()),
             address = Encrypted(this.address.toByteArray()),
+            type = this.type,
             createdAt = TimeZoned(value = this.createdAt),
             updatedAt = TimeZoned(value = this.updatedAt),
         )
@@ -58,6 +58,7 @@ internal class UserHRepo(session: StatelessSession) : HRepo<UserTable, User>(ses
         email = String(obj.email.value),
         phone = String(obj.phone.value),
         address = String(obj.address.value),
+        type = obj.type,
         createdAt = obj.createdAt.value,
         updatedAt = obj.updatedAt.value
     )

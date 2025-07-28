@@ -4,11 +4,13 @@ import com.solvesall.ktor_template.core.domain.User
 import com.solvesall.ktor_template.core.extend.random
 import com.solvesall.ktor_template.core.types.Encrypted
 import com.solvesall.ktor_template.core.types.Id
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.apache.logging.log4j.kotlin.logger
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.measureTime
 
@@ -28,6 +30,7 @@ class AppTest {
     fun `test repos`() {
         var user = random<User>()
         runBlocking {
+            delay(10.minutes)
             App.services.db.transaction("CREATE") {
                 it.repos.user.insert(obj = user)
             }
@@ -39,7 +42,7 @@ class AppTest {
 
                 runBlocking {
 
-                    repeat(1000) { index ->
+                    repeat(10000) { index ->
                         launch {
 
                             val i = Math.random().times(1000000000000000000).toLong()
@@ -58,6 +61,8 @@ class AppTest {
                             }
                         }
                     }
+
+                    delay(100.minutes)
 
 
                 }
