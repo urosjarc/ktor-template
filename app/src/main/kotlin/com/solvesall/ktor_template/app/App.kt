@@ -22,7 +22,7 @@ public object App {
 
     }
 
-    public suspend fun init(inMemoryDb: Boolean = true): Unit = this.initMutex.withLock {
+    public suspend fun init(inMemoryDb: Boolean): Unit = this.initMutex.withLock {
         if (this.inited.load()) {
             logger.info("App.init() already finished")
             return
@@ -30,19 +30,23 @@ public object App {
         logger.info("App.init()")
 
         val config = Configuration()
-        config.setProperty("hibernate.connection.username", "sa")
-        config.setProperty("hibernate.connection.password", "")
-        config.setProperty("hibernate.hbm2ddl.auto", "create-drop")
+        config.setProperty("hibernate.connection.username", Env.DB_USER)
+        config.setProperty("hibernate.connection.password", Env.DB_PASSWORD)
+        config.setProperty("hibernate.connection.isolation", Connection.TRANSACTION_READ_UNCOMMITTED)
         config.setProperty("hibernate.format_sql", true)
         config.setProperty("spring.jpa.properties.hibernate.check_nullability", true)
-        config.setProperty("hibernate.connection.isolation", Connection.TRANSACTION_READ_UNCOMMITTED)
         config.setProperty("hibernate.generate_statistics", true)
         if (inMemoryDb) {
+            config.setProperty("hibernate.hbm2ddl.auto", "create-drop")
             config.setProperty("hibernate.connection.driver_class", "org.h2.Driver")
             config.setProperty("hibernate.connection.url", "jdbc:h2:mem:database.h2;DB_CLOSE_DELAY=-1")
+            // config.setProperty("hibernate.connection.driver_class", "org.sqlite.JDBC")
+            // config.setProperty("hibernate.connection.url", "jdbc:sqlite:memory:database.sqlite3")
         } else {
-            config.setProperty("hibernate.connection.driver_class", "org.sqlite.JDBC")
-            config.setProperty("hibernate.connection.url", "jdbc:sqlite:memory:database.sqlite3")
+            // config.setProperty("hibernate.hbm2ddl.auto", "validate")
+            config.setProperty("hibernate.hbm2ddl.auto", "update")
+            config.setProperty("hibernate.connection.driver_class", Env.DB_DRIVER)
+            config.setProperty("hibernate.connection.url", Env.DB_URL)
         }
 
         services.db = HibernateDbService(poolSize = 10, statsSize = 100_000, config = config)
@@ -50,4 +54,6 @@ public object App {
         this.inited.store(true)
         logger.info("App.init() finished")
     }
+
+
 }

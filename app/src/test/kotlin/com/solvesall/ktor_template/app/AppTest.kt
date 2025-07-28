@@ -21,7 +21,7 @@ class AppTest {
 
     @BeforeTest
     fun setup() = runBlocking {
-        App.init()
+        App.init(inMemoryDb = false)
     }
 
     @Test
@@ -29,7 +29,7 @@ class AppTest {
         var user = random<User>()
         runBlocking {
             App.services.db.transaction("CREATE") {
-                it.repos.user.create(obj = user)
+                it.repos.user.insert(obj = user)
             }
         }
         var finals = 0.seconds
@@ -50,7 +50,7 @@ class AppTest {
                                 phone = Encrypted(i.toString().toByteArray())
                             )
                             App.services.db.transaction("CREATE") {
-                                it.repos.user.create(obj = newUser)
+                                it.repos.user.insert(obj = newUser)
                                 it.repos.user.select()
                                 it.repos.user.update(obj = newUser)
                                 it.repos.user.select(id = newUser.id)

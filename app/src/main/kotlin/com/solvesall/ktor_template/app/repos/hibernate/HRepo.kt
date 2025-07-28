@@ -17,10 +17,14 @@ internal abstract class HRepo<T, D>(val session: StatelessSession, val kclass: C
 
     internal abstract fun toRow(obj: D): HTable<D>
 
-    override fun create(obj: D): D? {
+    override fun upsert(obj: D) {
+        val row = toRow(obj)
+        session.upsert(row)
+    }
+
+    override fun insert(obj: D) {
         val row = toRow(obj)
         session.insert(row)
-        return row.domain
     }
 
     override fun select(): List<D> {
@@ -35,17 +39,14 @@ internal abstract class HRepo<T, D>(val session: StatelessSession, val kclass: C
         return entity?.domain
     }
 
-    override fun update(obj: D): D? {
+    override fun update(obj: D) {
         val row = toRow(obj)
-        val merged = session.update(row) as? HTable<D>
-        return merged?.domain
+        session.update(row)
     }
 
-    override fun delete(id: Id<D>): D? {
-        val entity = session.get(kclass, id.value.toJavaUuid()) as? HTable<D>
-            ?: return null
-        session.delete(entity)
-        return entity.domain
+    override fun delete(obj: D) {
+        val row = toRow(obj)
+        session.delete(row)
     }
 
 }
