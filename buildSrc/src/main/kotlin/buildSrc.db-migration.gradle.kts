@@ -34,7 +34,7 @@ liquibase {
         logger.lifecycle("")
         logger.lifecycle("Liquibase arguments:")
         args.forEach { (k, v) ->
-            logger.lifecycle(" - $k: $v")
+            logger.lifecycle(" - $k: '$v'")
         }
         logger.lifecycle("")
 
