@@ -33,4 +33,7 @@ dependencies {
     implementation("com.adarshr:gradle-test-logger-plugin:$gtlv")
 
     implementation("org.jetbrains.kotlin.plugin.jpa:org.jetbrains.kotlin.plugin.jpa.gradle.plugin:$kotlin")
+    implementation("org.liquibase:liquibase-gradle-plugin:3.0.2")
+    runtimeOnly("org.liquibase:liquibase-core:4.33.0")
+
 }

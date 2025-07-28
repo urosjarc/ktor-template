@@ -54,7 +54,7 @@ class AppTest {
                                 it.repos.user.select()
                                 it.repos.user.update(obj = newUser)
                                 it.repos.user.select(id = newUser.id)
-                                it.repos.user.delete(id = newUser.id)
+                                it.repos.user.deleteId(id = newUser.id)
                             }
                         }
                     }

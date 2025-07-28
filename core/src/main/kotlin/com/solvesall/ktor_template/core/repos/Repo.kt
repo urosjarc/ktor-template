@@ -19,6 +19,6 @@ public interface Repo<T> {
     public fun delete(obj: T)
     public fun delete(objs: List<T>)
 
-    public fun delete(ids: List<Id<T>>)
-    public fun delete(id: Id<T>)
+    public fun deleteId(ids: List<Id<T>>)
+    public fun deleteId(id: Id<T>)
 }

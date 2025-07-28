@@ -74,12 +74,12 @@ internal abstract class HRepo<T, D>(val session: StatelessSession, val kclass: C
         session.deleteMultiple(rows)
     }
 
-    override fun delete(id: Id<D>) {
+    override fun deleteId(id: Id<D>) {
         val entity = session.get(kclass, id.value.toJavaUuid()) as? HTable<D>
         session.delete(entity)
     }
 
-    override fun delete(ids: List<Id<D>>) {
+    override fun deleteId(ids: List<Id<D>>) {
         val entities = session.getMultiple(kclass, ids.map { it.value.toJavaUuid() }) as List<HTable<D>>
         session.deleteMultiple(entities)
     }
