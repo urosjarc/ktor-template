@@ -22,9 +22,19 @@ internal abstract class HRepo<T, D>(val session: StatelessSession, val kclass: C
         session.upsert(row)
     }
 
+    override fun upsert(objs: List<D>) {
+        val rows = objs.map { toRow(it) }
+        session.upsertMultiple(rows)
+    }
+
     override fun insert(obj: D) {
         val row = toRow(obj)
         session.insert(row)
+    }
+
+    override fun insert(objs: List<D>) {
+        val rows = objs.map { toRow(it) }
+        session.insertMultiple(rows)
     }
 
     override fun select(): List<D> {
@@ -39,14 +49,39 @@ internal abstract class HRepo<T, D>(val session: StatelessSession, val kclass: C
         return entity?.domain
     }
 
+    override fun select(ids: List<Id<D>>): List<D> {
+        val entities = session.getMultiple(kclass, ids.map { it.value.toJavaUuid() }) as List<HTable<D>>
+        return entities.map { it.domain }
+    }
+
     override fun update(obj: D) {
         val row = toRow(obj)
         session.update(row)
     }
 
+    override fun update(objs: List<D>) {
+        val rows = objs.map { toRow(it) }
+        session.updateMultiple(rows)
+    }
+
     override fun delete(obj: D) {
         val row = toRow(obj)
         session.delete(row)
+    }
+
+    override fun delete(objs: List<D>) {
+        val rows = objs.map { toRow(it) }
+        session.deleteMultiple(rows)
+    }
+
+    override fun delete(id: Id<D>) {
+        val entity = session.get(kclass, id.value.toJavaUuid()) as? HTable<D>
+        session.delete(entity)
+    }
+
+    override fun delete(ids: List<Id<D>>) {
+        val entities = session.getMultiple(kclass, ids.map { it.value.toJavaUuid() }) as List<HTable<D>>
+        session.deleteMultiple(entities)
     }
 
 }
