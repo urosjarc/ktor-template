@@ -38,7 +38,7 @@ internal abstract class HRepo<T, D>(val session: StatelessSession, val kclass: C
     }
 
     override fun select(): List<D> {
-        val query = session.createQuery("SELECT T FROM ${kclass.simpleName} T", kclass)
+        val query = session.createSelectionQuery("FROM ${kclass.simpleName} T", kclass)
         val resultList = query.resultList
         val domain = resultList.map { (it as HTable<D>).domain }
         return domain
@@ -75,13 +75,16 @@ internal abstract class HRepo<T, D>(val session: StatelessSession, val kclass: C
     }
 
     override fun deleteId(id: Id<D>) {
-        val entity = session.get(kclass, id.value.toJavaUuid()) as? HTable<D>
-        session.delete(entity)
+        session.createMutationQuery("DELETE FROM ${kclass.simpleName} t WHERE t.user.id = :id")
+            .setParameter("id", id.value.toJavaUuid())
+            .executeUpdate()
     }
 
     override fun deleteId(ids: List<Id<D>>) {
-        val entities = session.getMultiple(kclass, ids.map { it.value.toJavaUuid() }) as List<HTable<D>>
-        session.deleteMultiple(entities)
+        session.createMutationQuery("DELETE FROM ${kclass.simpleName} t WHERE t.id IN :ids")
+            .setParameter("ids", ids.map { it.value.toJavaUuid() })
+            .executeUpdate()
+
     }
 
 }

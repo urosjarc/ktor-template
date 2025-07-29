@@ -1,5 +1,7 @@
 package com.solvesall.ktor_template.app.services
 
+import com.solvesall.ktor_template.app.repos.hibernate.TaskHRepo
+import com.solvesall.ktor_template.app.repos.hibernate.TaskTable
 import com.solvesall.ktor_template.app.repos.hibernate.UserHRepo
 import com.solvesall.ktor_template.app.repos.hibernate.UserTable
 import com.solvesall.ktor_template.core.services.DbService
@@ -30,7 +32,8 @@ public class HibernateDbService(private val statsSize: Long, poolSize: Int, conf
         config.setProperty("hibernate.connection.pool_size", poolSize)
 
         config.addAnnotatedClasses(
-            UserTable::class.java
+            UserTable::class.java,
+            TaskTable::class.java
         )
 
         val serviceRegistry = StandardServiceRegistryBuilder()
@@ -43,7 +46,8 @@ public class HibernateDbService(private val statsSize: Long, poolSize: Int, conf
     public class HRepos(session: StatelessSession, private val tx: Transaction) : DbService.Transaction {
 
         public override val repos: DbService.Repos = DbService.Repos(
-            user = UserHRepo(session)
+            user = UserHRepo(session),
+            task = TaskHRepo(session)
         )
 
         override fun commit() {

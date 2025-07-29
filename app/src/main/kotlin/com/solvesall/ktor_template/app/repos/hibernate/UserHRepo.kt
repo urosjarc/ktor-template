@@ -8,7 +8,6 @@ import com.solvesall.ktor_template.core.types.Id
 import com.solvesall.ktor_template.core.types.TimeZoned
 import jakarta.persistence.*
 import org.hibernate.StatelessSession
-import org.hibernate.annotations.NamedQuery
 import org.hibernate.annotations.processing.CheckHQL
 import java.time.ZonedDateTime
 import java.util.*
@@ -16,12 +15,7 @@ import kotlin.uuid.toJavaUuid
 import kotlin.uuid.toKotlinUuid
 import jakarta.persistence.Id as ID
 
-private object HQL {
-    const val select_user_by_username = "1"
-}
-
 @CheckHQL
-@NamedQuery(name = HQL.select_user_by_username, query = "from UserTable u WHERE u.username = :username")
 @Entity
 @Table(name = "users")
 public data class UserTable(
@@ -33,7 +27,11 @@ public data class UserTable(
     @Column val address: String,
     @Column @Enumerated(EnumType.STRING) val type: User.Type,
     @Column val createdAt: ZonedDateTime,
-    @Column val updatedAt: ZonedDateTime
+    @Column val updatedAt: ZonedDateTime,
+
+    @OneToMany
+    val tasks: List<TaskTable> = emptyList(),
+
 ) : HTable<User> {
     override val domain: User
         get(): User = User(
@@ -64,7 +62,7 @@ internal class UserHRepo(session: StatelessSession) : HRepo<UserTable, User>(ses
     )
 
     override fun selectByUsername(username: String): User? =
-        session.createNamedQuery(HQL.select_user_by_username, UserTable::class.java)
+        session.createSelectionQuery("from UserTable u WHERE u.username = :username", UserTable::class.java)
             .setParameter("username", username)
             .resultList.firstOrNull()?.domain
 }

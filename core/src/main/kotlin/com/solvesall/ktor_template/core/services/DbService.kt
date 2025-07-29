@@ -1,5 +1,6 @@
 package com.solvesall.ktor_template.core.services
 
+import com.solvesall.ktor_template.core.repos.TaskRepo
 import com.solvesall.ktor_template.core.repos.UserRepo
 import com.solvesall.ktor_template.core.types.TimeZoned
 import kotlin.time.Duration
@@ -12,7 +13,8 @@ public interface DbService {
 		val error: Boolean,
 	)
 	public class Repos(
-		public val user: UserRepo
+		public val user: UserRepo,
+		public val task: TaskRepo
 	)
 	public interface Transaction {
 		public val repos: Repos
