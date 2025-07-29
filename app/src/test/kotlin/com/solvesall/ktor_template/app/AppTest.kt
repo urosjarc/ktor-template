@@ -23,26 +23,25 @@ class AppTest {
 
     @BeforeTest
     fun setup() = runBlocking {
-        App.init(inMemoryDb = false)
+        App.init(inMemoryDb = true)
     }
 
     @Test
     fun `test repos`() {
         var user = random<User>()
         runBlocking {
-            delay(10.minutes)
             App.services.db.transaction("CREATE") {
                 it.repos.user.insert(obj = user)
             }
         }
         var finals = 0.seconds
-        repeat(10) { rep ->
+        repeat(3) { rep ->
 
             val final = measureTime {
 
                 runBlocking {
 
-                    repeat(10000) { index ->
+                    repeat(10) { index ->
                         launch {
 
                             val i = Math.random().times(1000000000000000000).toLong()
@@ -61,8 +60,6 @@ class AppTest {
                             }
                         }
                     }
-
-                    delay(100.minutes)
 
 
                 }

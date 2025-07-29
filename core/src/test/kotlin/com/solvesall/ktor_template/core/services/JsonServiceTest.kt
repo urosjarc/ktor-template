@@ -28,7 +28,8 @@ class JsonServiceTest {
             phone = "+1234567890".encrypted(),
             address = "123 Test Street".encrypted(),
             createdAt = TimeZoned.nowUtc(),
-            updatedAt = TimeZoned.nowUtc()
+            updatedAt = TimeZoned.nowUtc(),
+            type = User.Type.ADMIN,
         )
     }
 
@@ -84,7 +85,8 @@ class JsonServiceTest {
             phone = "+1234567890".encrypted(),
             address = "123 Test Street".encrypted(),
             createdAt = TimeZoned.nowUtc(),
-            updatedAt = TimeZoned.nowUtc()
+            updatedAt = TimeZoned.nowUtc(),
+            type = User.Type.ADMIN,
         )
 
         // Act

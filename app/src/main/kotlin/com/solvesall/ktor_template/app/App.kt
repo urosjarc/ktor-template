@@ -43,8 +43,8 @@ public object App {
             config.setProperty("hibernate.hbm2ddl.auto", "create-drop")
             config.setProperty("hibernate.connection.driver_class", "org.h2.Driver")
             config.setProperty("hibernate.connection.url", "jdbc:h2:mem:database.h2;DB_CLOSE_DELAY=-1")
-            // config.setProperty("hibernate.connection.driver_class", "org.sqlite.JDBC")
-            // config.setProperty("hibernate.connection.url", "jdbc:sqlite:memory:database.sqlite3")
+//             config.setProperty("hibernate.connection.driver_class", "org.sqlite.JDBC")
+//             config.setProperty("hibernate.connection.url", "jdbc:sqlite:memory:database.sqlite3")
         } else {
             config.setProperty("hibernate.hbm2ddl.auto", "validate")
             config.setProperty("hibernate.connection.driver_class", Env.DB_DRIVER)
