@@ -20,7 +20,8 @@ kotlin {
         "kotlin.io.encoding.ExperimentalEncodingApi",
         "kotlinx.coroutines.DelicateCoroutinesApi",
         "kotlinx.coroutines.ExperimentalCoroutinesApi",
-        "kotlin.concurrent.atomics.ExperimentalAtomicApi"
+        "kotlin.concurrent.atomics.ExperimentalAtomicApi",
+        "kotlin.time.ExperimentalTime"
     )
 }
 repositories {
@@ -32,7 +33,7 @@ testlogger {
 
 dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+    testImplementation(kotlin("test"))
 }
 
 

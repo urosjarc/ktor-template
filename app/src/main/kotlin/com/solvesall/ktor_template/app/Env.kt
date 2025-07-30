@@ -8,4 +8,6 @@ internal object Env {
     val DB_PASSWORD = System.getenv("DB_PASSWORD")
     val DB_USER = System.getenv("DB_USER")
     val DB_NAME = System.getenv("DB_NAME")
+    val KEYSET_JWT: String = System.getenv("KEYSET_JWT")
+    val JWT_AUDIENCE: String = System.getenv("JWT_AUDIENCE")
 }

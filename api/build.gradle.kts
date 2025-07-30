@@ -8,6 +8,8 @@ val projectName = props.getProperty("project_name")
 plugins {
     id("buildSrc.common")
     id("buildSrc.server")
+    id("buildSrc.logging")
+    id("buildSrc.serialization")
     application
 }
 

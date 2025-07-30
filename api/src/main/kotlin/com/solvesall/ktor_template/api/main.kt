@@ -1,14 +1,17 @@
 package com.solvesall.ktor_template.api
 
+import com.solvesall.ktor_template.api.extend.ext_module
 import com.solvesall.ktor_template.app.App
-import com.solvesall.ktor_template.core.domain.User
-import com.solvesall.ktor_template.core.extend.random
+import io.ktor.server.application.*
+import io.ktor.server.engine.*
+import io.ktor.server.netty.*
 
 suspend fun main() {
-    App.init(inMemoryDb = false)
-    val user = random<User>()
-    App.services.db.transaction("CREATE") {
-        it.repos.user.insert(obj = user)
-    }
-    println("created user: $user")
+    App.init(inMemoryDb = true, createDropDb = true)
+    embeddedServer(
+        Netty,
+        host = "0.0.0.0",
+        port = Env.API_PORT,
+        module = Application::ext_module,
+    ).start(wait = true)
 }
