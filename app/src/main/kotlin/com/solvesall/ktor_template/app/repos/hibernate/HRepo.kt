@@ -87,4 +87,9 @@ internal abstract class HRepo<T, D>(val session: StatelessSession, val kclass: C
 
     }
 
+    override fun deleteAll() {
+        session.createMutationQuery("DELETE FROM ${kclass.simpleName} t")
+            .executeUpdate()
+    }
+
 }

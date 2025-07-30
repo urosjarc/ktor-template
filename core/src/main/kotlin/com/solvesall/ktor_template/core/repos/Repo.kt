@@ -3,6 +3,7 @@ package com.solvesall.ktor_template.core.repos
 import com.solvesall.ktor_template.core.types.Id
 
 public interface Repo<T> {
+
     public fun upsert(obj: T)
     public fun upsert(objs: List<T>)
 
@@ -21,4 +22,6 @@ public interface Repo<T> {
 
     public fun deleteId(ids: List<Id<T>>)
     public fun deleteId(id: Id<T>)
+
+    public fun deleteAll()
 }
