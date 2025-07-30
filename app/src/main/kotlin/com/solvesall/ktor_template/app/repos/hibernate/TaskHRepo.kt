@@ -4,9 +4,10 @@ import com.solvesall.ktor_template.core.domain.Task
 import com.solvesall.ktor_template.core.domain.User
 import com.solvesall.ktor_template.core.repos.TaskRepo
 import com.solvesall.ktor_template.core.types.Id
-import com.solvesall.ktor_template.core.types.TimeZoned
 import jakarta.persistence.*
 import org.hibernate.StatelessSession
+import org.hibernate.annotations.CreationTimestamp
+import org.hibernate.annotations.UpdateTimestamp
 import org.hibernate.annotations.processing.CheckHQL
 import java.time.ZonedDateTime
 import java.util.*
@@ -18,11 +19,12 @@ import jakarta.persistence.Id as ID
 @Entity
 @Table(name = "tasks")
 public data class TaskTable(
-    @ID val id: UUID,
+    @ID override val id: UUID,
 
     @Column val name: String,
-    @Column val createdAt: ZonedDateTime,
-    @Column val updatedAt: ZonedDateTime,
+
+    @Column @CreationTimestamp override val created_at: ZonedDateTime? = null,
+    @Column @UpdateTimestamp override val updated_at: ZonedDateTime? = null,
 
     @ManyToOne
     @JoinColumn(name = "user_id")
@@ -34,8 +36,8 @@ public data class TaskTable(
             id = Id(this.id.toKotlinUuid()),
             userId=Id(this.user.id.toKotlinUuid()),
             name=this.name,
-            createdAt = TimeZoned(value = this.createdAt),
-            updatedAt = TimeZoned(value = this.updatedAt),
+            createdAt = this.createdAt,
+            updatedAt = this.updatedAt,
         )
 }
 
@@ -46,9 +48,7 @@ internal class TaskHRepo(session: StatelessSession) : HRepo<TaskTable, Task>(ses
         return TaskTable(
             id = obj.id.value.toJavaUuid(),
             name = obj.name,
-            createdAt = obj.createdAt.value,
-            updatedAt = obj.updatedAt.value,
-            user = user
+            user = user,
         )
     }
 

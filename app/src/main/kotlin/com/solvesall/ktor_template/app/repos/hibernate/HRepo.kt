@@ -2,11 +2,21 @@ package com.solvesall.ktor_template.app.repos.hibernate
 
 import com.solvesall.ktor_template.core.repos.Repo
 import com.solvesall.ktor_template.core.types.Id
+import com.solvesall.ktor_template.core.types.TimeZoned
 import org.hibernate.StatelessSession
+import java.time.ZonedDateTime
+import java.util.*
 import kotlin.uuid.toJavaUuid
 
 public interface HTable<T> {
     public val domain: T
+
+    public val id: UUID
+    public val created_at: ZonedDateTime?
+    public val updated_at: ZonedDateTime?
+
+    public val createdAt: TimeZoned get() = TimeZoned(value=this.created_at!!)
+    public val updatedAt: TimeZoned get() = TimeZoned(value=this.updated_at!!)
 
     public interface Companion<T> {
         public fun toRow(obj: T): HTable<T>

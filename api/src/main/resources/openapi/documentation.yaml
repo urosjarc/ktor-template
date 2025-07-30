@@ -1,0 +1,187 @@
+openapi: "3.1.0"
+info:
+  title: "ktor_template API"
+  description: "ktor_template API"
+  version: "0.0.0"
+servers:
+  - url: "http://localhost:8080"
+tags:
+  - name: "System"
+    description: "Providing system endpoints"
+  - name: "User"
+    description: "Providing user endpoints"
+paths:
+  /api/system/metrics:
+    get:
+      tags:
+        - "System"
+      description: "Get system metrics"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            text/plain:
+              schema:
+                type: "string"
+  /api/system/status:
+    get:
+      tags:
+        - "System"
+      description: "Get system status report."
+      responses:
+        "200":
+          description: "OK"
+          content:
+            'application/json':
+              schema:
+                $ref: "#/components/schemas/SystemStatus"
+  /api/v1/users:
+    get:
+      tags:
+        - "User"
+      description: ""
+      responses:
+        "200":
+          description: "OK"
+          content:
+            'application/json':
+              schema:
+                type: "array"
+                items:
+                  $ref: "#/components/schemas/User"
+  /api/v1/users/{id}:
+    get:
+      tags:
+        - "User"
+      description: ""
+      parameters:
+        - name: "parent"
+          in: "query"
+          required: true
+          schema:
+            $ref: "#/components/schemas/system"
+        - name: "id"
+          in: "path"
+          required: true
+          schema:
+            $ref: "#/components/schemas/Uuid"
+      responses:
+        "400":
+          description: "Bad Request"
+          content:
+            'application/json':
+              schema:
+                $ref: "#/components/schemas/ErrorRes"
+        "200":
+          description: "OK"
+          content:
+            'application/json':
+              schema:
+                $ref: "#/components/schemas/User"
+components:
+  schemas:
+    ErrorRes:
+      type: "object"
+      properties:
+        error:
+          type: "string"
+          enum:
+            - "USER"
+            - "SYSTEM"
+        status:
+          type: "string"
+        info:
+          type: "string"
+      required:
+        - "error"
+        - "status"
+        - "info"
+    Time:
+      type: "object"
+      properties:
+        system:
+          type: "string"
+          format: "date-time"
+        utc:
+          type: "string"
+          format: "date-time"
+        slovenia:
+          type: "string"
+          format: "date-time"
+      required:
+        - "system"
+        - "utc"
+        - "slovenia"
+    SystemStatus:
+      type: "object"
+      properties:
+        systemTime:
+          $ref: "#/components/schemas/Time"
+        dbService:
+          type: "string"
+          enum:
+            - "OK"
+            - "FAIL"
+      required:
+        - "systemTime"
+        - "dbService"
+    Uuid:
+      type: "object"
+      properties:
+        mostSignificantBits:
+          type: "integer"
+          format: "int64"
+        leastSignificantBits:
+          type: "integer"
+          format: "int64"
+      required:
+        - "mostSignificantBits"
+        - "leastSignificantBits"
+    User:
+      type: "object"
+      properties:
+        id:
+          $ref: "#/components/schemas/Uuid"
+        username:
+          type: "string"
+        password:
+          type: "array"
+          items:
+            type: "string"
+            format: "byte"
+        email:
+          type: "array"
+          items:
+            type: "string"
+            format: "byte"
+        phone:
+          type: "array"
+          items:
+            type: "string"
+            format: "byte"
+        address:
+          type: "array"
+          items:
+            type: "string"
+            format: "byte"
+        type:
+          type: "string"
+          enum:
+            - "ADMIN"
+            - "CUSTOMER"
+        createdAt:
+          type: "string"
+          format: "date-time"
+        updatedAt:
+          type: "string"
+          format: "date-time"
+      required:
+        - "id"
+        - "username"
+        - "password"
+        - "email"
+        - "phone"
+        - "address"
+        - "type"
+        - "createdAt"
+        - "updatedAt"

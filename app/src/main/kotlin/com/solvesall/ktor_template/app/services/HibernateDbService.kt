@@ -65,7 +65,7 @@ public class HibernateDbService(private val statsSize: Long, poolSize: Int, conf
 
     override val stats: Map<String, List<DbService.TransactionStat>> get() = txStats.toMap()
 
-    override suspend fun <T> transaction(name: String, block: (DbService.Transaction) -> T?): T? = withContext(this.txDispatcher) {
+    override suspend fun <T> transaction(name: String, block: (DbService.Transaction) -> T): T = withContext(this.txDispatcher) {
         val session = sessionFactory.openStatelessSession()
         val tx: Transaction = session.transaction
 
@@ -76,7 +76,7 @@ public class HibernateDbService(private val statsSize: Long, poolSize: Int, conf
 
         return@withContext try {
             tx.begin()
-            val result: T?
+            val result: T
             runTime = measureTime { result = block(repos) }
             tx.commit()
             result
@@ -86,7 +86,7 @@ public class HibernateDbService(private val statsSize: Long, poolSize: Int, conf
             if (tx.isActive) {
                 tx.rollback()
             }
-            null
+            throw e
         } finally {
             session.close()
             txStatsMutex.withLock {

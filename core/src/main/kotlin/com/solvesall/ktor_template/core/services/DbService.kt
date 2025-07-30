@@ -3,6 +3,7 @@ package com.solvesall.ktor_template.core.services
 import com.solvesall.ktor_template.core.repos.TaskRepo
 import com.solvesall.ktor_template.core.repos.UserRepo
 import com.solvesall.ktor_template.core.types.TimeZoned
+import kotlinx.coroutines.withContext
 import kotlin.time.Duration
 
 public interface DbService {
@@ -23,6 +24,6 @@ public interface DbService {
 		public fun timeout(duration: Duration)
 	}
 
-	public suspend fun <T> transaction(name: String, block: (tx: Transaction) -> T?): T?
+	public suspend fun <T> transaction(name: String, block: (DbService.Transaction) -> T): T
 	public val stats: Map<String, List<TransactionStat>>
 }

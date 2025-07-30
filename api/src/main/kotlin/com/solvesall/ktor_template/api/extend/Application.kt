@@ -2,6 +2,8 @@ package com.solvesall.ktor_template.api.extend
 
 import com.solvesall.ktor_template.api.Env
 import com.solvesall.ktor_template.api.routes.v1.systemRoutes
+import com.solvesall.ktor_template.api.routes.v1.tasksRoutes
+import com.solvesall.ktor_template.api.routes.v1.usersRoutes
 import com.solvesall.ktor_template.app.App
 import com.solvesall.ktor_template.core.extend.ext_resourceFile
 import io.ktor.http.*
@@ -53,9 +55,6 @@ fun Application.ext_module() {
         this.allowMethod(HttpMethod.Get)
         this.allowMethod(HttpMethod.Delete)
     }
-    install(Authentication) {
-        customJwt("custom-token")
-    }
 
     install(MicrometerMetrics) {
         registry = Env.appMicrometerRegistry
@@ -102,11 +101,8 @@ fun Application.ext_module() {
 
             authenticate("custom-token") {
                 route("v1") {
-                    analyticsRoutes()
-                    weatherRoutes()
-                    locationRoutes()
-                    bikesRoutes()
-                    routingRoutes()
+                    usersRoutes()
+                    tasksRoutes()
                 }
             }
         }
