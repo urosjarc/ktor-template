@@ -1,4 +1,4 @@
-package com.solvesall.ktor_template.api.response
+package com.solvesall.ktor_template.api.responses
 
 import com.solvesall.ktor_template.core.types.TimeZoned
 import kotlinx.serialization.Serializable

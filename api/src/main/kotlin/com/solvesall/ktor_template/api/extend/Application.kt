@@ -3,6 +3,7 @@ package com.solvesall.ktor_template.api.extend
 import com.solvesall.ktor_template.api.Env
 import com.solvesall.ktor_template.api.routes.v1.systemRoutes
 import com.solvesall.ktor_template.api.routes.v1.tasksRoutes
+import com.solvesall.ktor_template.api.routes.v1.usersEvents
 import com.solvesall.ktor_template.api.routes.v1.usersRoutes
 import com.solvesall.ktor_template.app.App
 import com.solvesall.ktor_template.core.extend.ext_resourceFile
@@ -20,6 +21,7 @@ import io.ktor.server.plugins.swagger.*
 import io.ktor.server.request.*
 import io.ktor.server.resources.*
 import io.ktor.server.routing.*
+import io.ktor.server.sse.*
 import io.micrometer.core.instrument.binder.jvm.*
 import io.micrometer.core.instrument.binder.logging.Log4j2Metrics
 import io.micrometer.core.instrument.binder.system.ProcessorMetrics
@@ -32,10 +34,22 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 fun Application.ext_module() {
+    install(CORS) {
+        this.allowHeader(HttpHeaders.ContentType)
+        this.allowHeader(HttpHeaders.Authorization)
+        this.anyHost()
+        this.allowMethod(HttpMethod.Post)
+        this.allowMethod(HttpMethod.Put)
+        this.allowMethod(HttpMethod.Get)
+        this.allowMethod(HttpMethod.Delete)
+    }
+
     install(Resources)
+
     install(ContentNegotiation) {
         json(App.services.json.module)
     }
+
     install(StatusPages) {
         exception<BadRequestException> { call, cause ->
             logger.warn("CLIENT ERROR", cause)
@@ -45,15 +59,6 @@ fun Application.ext_module() {
             logger.error("SYSTEM ERROR", cause)
             call.ext_systemError(info = cause::class.simpleName.toString())
         }
-    }
-    install(CORS) {
-        this.allowHeader(HttpHeaders.ContentType)
-        this.allowHeader(HttpHeaders.Authorization)
-        this.anyHost()
-        this.allowMethod(HttpMethod.Post)
-        this.allowMethod(HttpMethod.Put)
-        this.allowMethod(HttpMethod.Get)
-        this.allowMethod(HttpMethod.Delete)
     }
 
     install(MicrometerMetrics) {
@@ -93,6 +98,8 @@ fun Application.ext_module() {
         }
     }
 
+    install(SSE)
+
     routing {
         route("api") {
 
@@ -102,6 +109,8 @@ fun Application.ext_module() {
             authenticate("custom-token") {
                 route("v1") {
                     usersRoutes()
+                    usersEvents()
+
                     tasksRoutes()
                 }
             }

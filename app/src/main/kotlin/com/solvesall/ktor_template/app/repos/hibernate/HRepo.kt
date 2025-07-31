@@ -15,8 +15,8 @@ public interface HTable<T> {
     public val created_at: ZonedDateTime?
     public val updated_at: ZonedDateTime?
 
-    public val createdAt: TimeZoned get() = TimeZoned(value=this.created_at!!)
-    public val updatedAt: TimeZoned get() = TimeZoned(value=this.updated_at!!)
+    public val createdAt: TimeZoned get() = TimeZoned(value = this.created_at!!)
+    public val updatedAt: TimeZoned get() = TimeZoned(value = this.updated_at!!)
 
     public interface Companion<T> {
         public fun toRow(obj: T): HTable<T>
@@ -26,6 +26,11 @@ public interface HTable<T> {
 internal abstract class HRepo<T, D>(val session: StatelessSession, val kclass: Class<T>) : Repo<D> {
 
     internal abstract fun toRow(obj: D): HTable<D>
+
+    override fun count(): Long = session.createSelectionQuery(
+        "SELECT COUNT(*) FROM ${kclass.simpleName}",
+        Long::class.java
+    ).singleResult
 
     override fun upsert(obj: D) {
         val row = toRow(obj)

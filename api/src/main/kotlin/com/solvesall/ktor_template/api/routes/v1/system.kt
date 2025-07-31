@@ -1,7 +1,7 @@
 package com.solvesall.ktor_template.api.routes.v1
 
 import com.solvesall.ktor_template.api.Env
-import com.solvesall.ktor_template.api.response.SystemStatus
+import com.solvesall.ktor_template.api.responses.SystemStatus
 import com.solvesall.ktor_template.core.types.TimeZoned
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode

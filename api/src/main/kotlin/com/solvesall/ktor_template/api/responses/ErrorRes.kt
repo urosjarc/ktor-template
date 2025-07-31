@@ -1,4 +1,4 @@
-package com.solvesall.ktor_template.api.response
+package com.solvesall.ktor_template.api.responses
 
 import kotlinx.serialization.Serializable
 

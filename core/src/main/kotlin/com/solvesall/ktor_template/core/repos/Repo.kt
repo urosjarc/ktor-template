@@ -3,6 +3,7 @@ package com.solvesall.ktor_template.core.repos
 import com.solvesall.ktor_template.core.types.Id
 
 public interface Repo<T> {
+    public fun count(): Long
 
     public fun upsert(obj: T)
     public fun upsert(objs: List<T>)

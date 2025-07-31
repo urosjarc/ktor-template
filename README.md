@@ -24,5 +24,4 @@ and both a build cache and a configuration cache (see `gradle.properties`).
 
 # Todos
 
-- Enumerator support in database hibernate
-- Checking deadlocks
+- Auditing (database level)
