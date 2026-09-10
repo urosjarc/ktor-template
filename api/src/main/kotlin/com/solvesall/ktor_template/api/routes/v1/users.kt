@@ -18,8 +18,6 @@ import kotlinx.coroutines.delay
  * @OpenAPITag users
  * Providing users endpoints
  */
-val userEvents = EventRes.cache<User>()
-
 @Resource("users")
 class users {
     @Resource("{id}")

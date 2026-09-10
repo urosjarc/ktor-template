@@ -100,6 +100,27 @@ fun Application.ext_module() {
 
     install(SSE)
 
+    install(Authentication) {
+        provider("custom-token") {
+            authenticate { context ->
+                val authHeader = context.call.request.headers[HttpHeaders.Authorization]
+                val token = authHeader?.takeIf { it.startsWith("Bearer ", ignoreCase = true) }?.substring(7)?.trim()
+
+                if (token != null) {
+                    val jwt = App.services.jwt.decode(jwt = token, audience = "api")
+                    if (jwt != null) {
+                        return@authenticate
+                    }
+                }
+
+                context.challenge("custom-token", AuthenticationFailedCause.InvalidCredentials) { challenge, call ->
+                    call.ext_clientUnauthorized()
+                    challenge.complete()
+                }
+            }
+        }
+    }
+
     routing {
         route("api") {
 
