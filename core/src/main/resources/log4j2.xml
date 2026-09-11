@@ -93,9 +93,6 @@
 			<AppenderRef level="warn" ref="Async-File-warn"/>
 			<AppenderRef level="error" ref="Async-File-error"/>
 		</Root>
-		<Logger name="org.hibernate" level="INFO"/>
-		<logger name="org.hibernate.SQL" level="DEBUG"/>
-		<logger name="org.hibernate.stat" level="TRACE"/>
-		<logger name="org.jboss.logging" level="INFO"/>
+		<Logger name="io.netty" level="INFO"/>
 	</Loggers>
 </Configuration>

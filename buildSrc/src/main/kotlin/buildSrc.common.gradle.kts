@@ -1,45 +1,48 @@
 import org.gradle.api.tasks.testing.logging.TestLogEvent
-import java.util.Properties
+import org.gradle.api.artifacts.VersionCatalogsExtension
 
-val props = Properties().apply { load(rootProject.file("project.properties").inputStream()) }
-val projectVersion = props.getProperty("project_version")
-val projectDescription = props.getProperty("project_description")
-val projectGroup = props.getProperty("project_group")
-val jdk = props.getProperty("jdk").toInt()
+val libs = the<VersionCatalogsExtension>().named("libs")
 
 plugins {
     kotlin("jvm")
+    kotlin("plugin.serialization")
     id("org.jetbrains.dokka")
     id("com.adarshr.test-logger")
     id("org.jetbrains.kotlinx.kover")
 }
+
 kotlin {
-    jvmToolchain(jdk)
+
+    jvmToolchain(libs.findVersion("jvm").get().requiredVersion.toInt())
+
     compilerOptions.optIn.addAll(
-        "kotlin.uuid.ExperimentalUuidApi",
-        "kotlin.io.encoding.ExperimentalEncodingApi",
         "kotlinx.coroutines.DelicateCoroutinesApi",
-        "kotlinx.coroutines.ExperimentalCoroutinesApi",
         "kotlin.concurrent.atomics.ExperimentalAtomicApi",
-        "kotlin.time.ExperimentalTime"
     )
 }
 repositories {
     mavenCentral()
 }
+
 testlogger {
     this.setTheme("mocha")
 }
 
 dependencies {
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    implementation(libs.findBundle("kotlinx").get())
+    implementation(libs.findBundle("logging").get())
+    runtimeOnly(libs.findBundle("logging-runtime").get())
     testImplementation(kotlin("test"))
 }
+configurations.configureEach {
+    exclude(group = "ch.qos.logback", module = "logback-classic")
+    exclude(group = "ch.qos.logback", module = "logback-core")
+}
 
-
-group = projectGroup
-rootProject.version = projectVersion
-rootProject.description = projectDescription
+//TODO:FIX THIS
+//group = ""
+//rootProject.version = projectVersion
+//rootProject.description = projectDescription
 
 tasks.withType<Test>().configureEach {
     // Configure all test Gradle tasks to use JUnitPlatform.

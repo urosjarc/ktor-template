@@ -1,0 +1,131 @@
+[versions]
+jvm = "21"
+kotlin = "2.4.0"
+ktor = "3.5.2"
+log4j = "2.26.1"
+exposed = "1.3.1"
+opentelemetry = "1.63.0"
+netty = "4.2.16.Final"
+
+[plugins]
+
+
+[libraries]
+
+# OTHERS
+faker = { module = "io.github.serpro69:kotlin-faker", version = "1.16.2" }
+
+# KOTLINX
+kotlinx-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version = "1.11.0" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version = "1.11.0" }
+
+# ORM
+exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed" }
+exposed-r2dbc = { module = "org.jetbrains.exposed:exposed-r2dbc", version.ref = "exposed" }
+
+# DATABASE
+postgresql = { module = "org.postgresql:postgresql", version = "42.7.13" }
+h2database-h2 = { module = "com.h2database:h2", version = "2.4.240" }
+h2database-r2dbc = { module = "io.r2dbc:r2dbc-h2", version = "1.1.0.RELEASE" }
+
+# LOGGING
+log4j-api-kotlin = { module = "org.apache.logging.log4j:log4j-api-kotlin", version = "1.5.0" }
+log4j-core = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
+log4j-slf4j2 = { module = "org.apache.logging.log4j:log4j-slf4j2-impl", version.ref = "log4j" }
+
+# SECURITY
+google-tink = { module = "com.google.crypto.tink:tink", version = "1.16.0" }
+spring-security-core = { module = "org.springframework.security:spring-security-core", version = "6.4.2" }
+bouncycastle-prov = { module = "org.bouncycastle:bcprov-jdk18on", version = "1.80" }
+
+# SERVER
+ktor-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor" }
+ktor-auth-jwt = { module = "io.ktor:ktor-server-auth-jwt", version.ref = "ktor" }
+ktor-callId = { module = "io.ktor:ktor-server-call-id", version.ref = "ktor" }
+ktor-callLogging = { module = "io.ktor:ktor-server-call-logging", version.ref = "ktor" }
+ktor-compression = { module = "io.ktor:ktor-server-compression", version.ref = "ktor" }
+ktor-config = { module = "io.ktor:ktor-server-config-yaml", version.ref = "ktor" }
+ktor-contentNegotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
+ktor-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktor-cors = { module = "io.ktor:ktor-server-cors", version.ref = "ktor" }
+ktor-csrf = { module = "io.ktor:ktor-server-csrf", version.ref = "ktor" }
+ktor-defaultHeaders = { module = "io.ktor:ktor-server-default-headers", version.ref = "ktor" }
+ktor-forwardedHeader = { module = "io.ktor:ktor-server-forwarded-header", version.ref = "ktor" }
+ktor-metrics = { module = "io.ktor:ktor-server-metrics-micrometer", version.ref = "ktor" }
+ktor-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }
+ktor-openapi = { module = "io.ktor:ktor-server-openapi", version.ref = "ktor" }
+ktor-resources = { module = "io.ktor:ktor-server-resources", version.ref = "ktor" }
+ktor-routingOpenapi = { module = "io.ktor:ktor-server-routing-openapi", version.ref = "ktor" }
+ktor-sse = { module = "io.ktor:ktor-server-sse", version.ref = "ktor" }
+ktor-statusPages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktor" }
+ktor-swagger = { module = "io.ktor:ktor-server-swagger", version.ref = "ktor" }
+ktor-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor" }
+cohort-cohortKtor = { module = "com.sksamuel.cohort:cohort-ktor", version = "2.9.10" }
+flaxoos-ktor-server-rateLimiting = { module = "io.github.flaxoos:ktor-server-rate-limiting", version = "2.3.0" }
+micrometer-registryPrometheus = { module = "io.micrometer:micrometer-registry-prometheus", version = "1.17.0" }
+openfolder-kotlinAsyncapiKtor = { module = "org.openfolder:kotlin-asyncapi-ktor", version = "3.2.3" }
+opentelemetry-exporterOtlp = { module = "io.opentelemetry:opentelemetry-exporter-otlp", version.ref = "opentelemetry" }
+opentelemetry-ktorInstrumentation = { module = "io.opentelemetry.instrumentation:opentelemetry-ktor-3.0", version = "2.29.0-alpha" }
+opentelemetry-sdkAutoconfigure = { module = "io.opentelemetry:opentelemetry-sdk-extension-autoconfigure", version.ref = "opentelemetry" }
+opentelemetry-semconv = { module = "io.opentelemetry.semconv:opentelemetry-semconv", version = "1.42.0" }
+
+# BUILDSRC
+kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+kotlin-serialization-plugin = { module = "org.jetbrains.kotlin:kotlin-serialization", version.ref = "kotlin" }
+kover-gradle-plugin = { module = "org.jetbrains.kotlinx:kover-gradle-plugin", version = "0.9.1" }
+dokka-gradle-plugin = { module = "org.jetbrains.dokka:dokka-gradle-plugin", version = "2.0.0" }
+gradle-test-logger-plugin = { module = "com.adarshr:gradle-test-logger-plugin", version = "4.0.0" }
+
+[bundles]
+kotlinx = ["kotlinx-coroutines", "kotlinx-serialization-json"]
+
+logging = ["log4j-api-kotlin"]
+logging-runtime = ["log4j-core", "log4j-slf4j2"]
+
+security = ["google-tink", "spring-security-core"]
+security-runtime = ["bouncycastle-prov"]
+
+database = ["exposed-core", "exposed-r2dbc"]
+database-runtime = ["postgresql", "h2database-h2", "h2database-r2dbc"]
+
+buildsrc = [
+    "kotlin-gradle-plugin",
+    "kover-gradle-plugin",
+    "dokka-gradle-plugin",
+    "gradle-test-logger-plugin",
+    "kotlin-serialization-plugin"
+]
+
+server = [
+    "cohort-cohortKtor",
+    "flaxoos-ktor-server-rateLimiting",
+    "micrometer-registryPrometheus",
+    "openfolder-kotlinAsyncapiKtor",
+    "opentelemetry-exporterOtlp",
+    "opentelemetry-ktorInstrumentation",
+    "opentelemetry-sdkAutoconfigure",
+    "opentelemetry-semconv",
+    "ktor-json",
+    "ktor-auth",
+    "ktor-auth-jwt",
+    "ktor-callId",
+    "ktor-callLogging",
+    "ktor-compression",
+    "ktor-config",
+    "ktor-contentNegotiation",
+    "ktor-core",
+    "ktor-cors",
+    "ktor-csrf",
+    "ktor-defaultHeaders",
+    "ktor-forwardedHeader",
+    "ktor-metrics",
+    "ktor-netty",
+    "ktor-openapi",
+    "ktor-resources",
+    "ktor-routingOpenapi",
+    "ktor-sse",
+    "ktor-statusPages",
+    "ktor-swagger",
+    "ktor-websockets",
+]
