@@ -1,6 +1,7 @@
 package com.urosjarc.ktor_template.core.repos
 
 import com.urosjarc.ktor_template.core.types.Id
+import com.urosjarc.ktor_template.core.types.Pagination
 
 public interface Repo<T> {
     public suspend fun createTable()
@@ -15,6 +16,7 @@ public interface Repo<T> {
     public suspend fun select(): List<T>
     public suspend fun select(id: Id<T>): T?
     public suspend fun select(ids: List<Id<T>>): List<T>
+    public suspend fun select(pagination: Pagination): Pagination.Page<T>
 
     public suspend fun update(obj: T)
     public suspend fun update(objs: List<T>)

@@ -29,7 +29,7 @@ internal object UserTable : ExpTable<User>("users") {
     }
 }
 
-internal object UserExpRepo: Repo<User>, UserRepo, ExpRepo<User>(table = UserTable) {
+internal object UserExpRepo : Repo<User>, UserRepo, ExpRepo<User>(table = UserTable) {
     override fun selectByUsername(username: String): User? {
         TODO("Not yet implemented")
     }

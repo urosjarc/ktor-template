@@ -3,6 +3,7 @@ package com.urosjarc.ktor_template.app.repos.exposed
 import com.urosjarc.ktor_template.core.domain.Domain
 import com.urosjarc.ktor_template.core.repos.Repo
 import com.urosjarc.ktor_template.core.types.Id
+import com.urosjarc.ktor_template.core.types.Pagination
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.singleOrNull
 import kotlinx.coroutines.flow.toList
@@ -21,6 +22,18 @@ internal abstract class ExpTable<T>(name: String) : UuidTable(name, uuidVersion 
     abstract fun toDomain(row: ResultRow): T
     abstract fun toRow(tx: UpdateBuilder<Int>, domain: T)
 }
+
+
+internal val queryTable = QueryTable(
+    table = UserTable,
+    primaryKey = "id",
+    defaultSort = listOf(
+        Pagination.Sort(
+            column = "id",
+            direction = Pagination.Sort.Direction.ASC
+        )
+    ),
+)
 
 internal open class ExpRepo<T : Domain<T>>(val table: ExpTable<T>) : Repo<T> {
     override suspend fun createTable() {
@@ -50,6 +63,16 @@ internal open class ExpRepo<T : Domain<T>>(val table: ExpTable<T>) : Repo<T> {
             .where { table.id inList ids.map { it.value } }
             .map(table::toDomain)
             .toList()
+    }
+
+    override suspend fun select(pagination: Pagination): Pagination.Page<T> {
+        val page =
+            PaginationCompiler(table = queryTable).apply(request = pagination, source = table.selectAll())
+
+        return Pagination.Page<T>(
+            data = page.data.map(table::toDomain),
+            nextCursor = page.nextCursor
+        )
     }
 
     override suspend fun insert(obj: T) {

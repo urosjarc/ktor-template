@@ -1,5 +1,6 @@
 package com.urosjarc.ktor_template.app.services
 
+import com.urosjarc.ktor_template.app.repos.exposed.TaskExpRepo
 import com.urosjarc.ktor_template.app.repos.exposed.UserExpRepo
 import com.urosjarc.ktor_template.core.services.DbService
 import com.urosjarc.ktor_template.core.types.TimeZoned
@@ -48,7 +49,8 @@ internal class ExposedDbService(private val statsSize: Long) : DbService {
         private var isCompleted = false
 
         override val repos: DbService.Repos = DbService.Repos(
-            user = UserExpRepo
+            user = UserExpRepo,
+            task = TaskExpRepo,
         )
 
         override suspend fun commit() {

@@ -1,5 +1,6 @@
 package com.urosjarc.ktor_template.core.services
 
+import com.urosjarc.ktor_template.core.repos.TaskRepo
 import com.urosjarc.ktor_template.core.repos.UserRepo
 import com.urosjarc.ktor_template.core.types.TimeZoned
 import kotlin.time.Duration
@@ -14,6 +15,7 @@ public interface DbService {
 
     public class Repos(
         public val user: UserRepo,
+        public val task: TaskRepo,
     )
 
     public interface Transaction {

@@ -4,6 +4,7 @@ import com.urosjarc.ktor_template.api.extend.ext_clientError
 import com.urosjarc.ktor_template.app.App
 import com.urosjarc.ktor_template.core.domain.User
 import com.urosjarc.ktor_template.core.types.Id
+import com.urosjarc.ktor_template.core.types.Pagination
 import io.ktor.http.*
 import io.ktor.resources.*
 import io.ktor.server.request.*
@@ -20,6 +21,9 @@ import kotlinx.coroutines.delay
  */
 @Resource("users")
 class users {
+    @Resource("search")
+    class search(val parent: users, val pagination: Pagination)
+
     @Resource("{id}")
     class id(val parent: users, val id: Id<User>)
 }
@@ -27,6 +31,10 @@ class users {
 fun Route.usersRoutes() {
     get<users> {
         val users = App.services.db.transaction("GET USERS") { tx -> tx.repos.user.select() }
+        this.call.respond(users)
+    }
+    post<users.search> {
+        val users = App.services.db.transaction("SEARCH USERS") { tx -> tx.repos.user.select(pagination = it.pagination) }
         this.call.respond(users)
     }
     post<users> {

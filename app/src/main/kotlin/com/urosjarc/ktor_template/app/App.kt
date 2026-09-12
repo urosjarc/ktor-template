@@ -2,17 +2,16 @@ package com.urosjarc.ktor_template.app
 
 import com.urosjarc.ktor_template.app.services.ExposedDbService
 import com.urosjarc.ktor_template.app.services.TinkeyJwtService
+import com.urosjarc.ktor_template.core.domain.Task
 import com.urosjarc.ktor_template.core.domain.User
 import com.urosjarc.ktor_template.core.extend.random
 import com.urosjarc.ktor_template.core.services.DbService
 import com.urosjarc.ktor_template.core.services.JsonService
 import com.urosjarc.ktor_template.core.services.JwtService
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.apache.logging.log4j.kotlin.logger
 import kotlin.concurrent.atomics.AtomicBoolean
-import kotlin.time.Duration.Companion.seconds
 
 public object App {
 
@@ -51,24 +50,30 @@ public object App {
     }
 
     public suspend fun seed() {
+
+        val users = mutableListOf<User>()
+        val tasks = mutableListOf<Task>()
+
+        repeat(10) {
+            val user = random<User>()
+            users.add(user)
+            repeat(10) {
+                val task = random<Task>().copy(userId = user.id)
+                tasks.add(task)
+            }
+        }
+
         services.db.transaction("CREATE") { tx ->
             tx.repos.user.createTable()
-        }
+            tx.repos.task.createTable()
 
-        services.db.transaction("SEED") { tx ->
+            tx.repos.task.deleteAll()
             tx.repos.user.deleteAll()
-            delay(5.seconds)
-            repeat(10) {
-                tx.repos.user.insert(obj = random<User>())
-            }
 
-        }
-
-        services.db.transaction("SEED SELECT") { tx ->
-            tx.repos.user.select().forEach { println(it) }
+            tx.repos.user.insert(users)
+            tx.repos.task.insert(tasks)
         }
 
     }
-
 
 }
