@@ -16,6 +16,7 @@ kotlin {
     jvmToolchain(libs.findVersion("jvm").get().requiredVersion.toInt())
 
     compilerOptions.optIn.addAll(
+        "kotlin.uuid.ExperimentalUuidApi",
         "kotlinx.coroutines.DelicateCoroutinesApi",
         "kotlin.concurrent.atomics.ExperimentalAtomicApi",
     )

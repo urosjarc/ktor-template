@@ -2,7 +2,6 @@ package com.urosjarc.ktor_template.api.extend
 
 import com.urosjarc.ktor_template.api.Env
 import com.urosjarc.ktor_template.api.routes.v1.systemRoutes
-import com.urosjarc.ktor_template.api.routes.v1.tasksRoutes
 import com.urosjarc.ktor_template.api.routes.v1.usersEvents
 import com.urosjarc.ktor_template.api.routes.v1.usersRoutes
 import com.urosjarc.ktor_template.app.App
@@ -131,8 +130,6 @@ fun Application.ext_module() {
                 route("v1") {
                     usersRoutes()
                     usersEvents()
-
-                    tasksRoutes()
                 }
             }
         }

@@ -14,7 +14,7 @@ import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
 
 
-public class TinkeyJwtService(privateKeyset: String) : JwtService {
+internal class TinkeyJwtService(privateKeyset: String) : JwtService {
     public override val publicKey: String
     private val signer: JwtPublicKeySign
     private var verifier: JwtPublicKeyVerify

@@ -5,7 +5,7 @@ import kotlin.uuid.Uuid
 
 @JvmInline
 @Serializable
-public value class Id<T>(public val value: Uuid = Uuid.random()) {
+public value class Id<T>(public val value: Uuid = Uuid.generateV7()) {
 	override fun toString(): String = this.value.toString()
 }
 

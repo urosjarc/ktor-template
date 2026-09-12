@@ -21,6 +21,8 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 # ORM
 exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed" }
 exposed-r2dbc = { module = "org.jetbrains.exposed:exposed-r2dbc", version.ref = "exposed" }
+exposed-kotlin-datetime = { module = "org.jetbrains.exposed:exposed-kotlin-datetime", version.ref = "exposed" }
+r2dbc-pool = {module = "io.r2dbc:r2dbc-pool", version = "1.0.2.RELEASE" }
 
 # DATABASE
 postgresql = { module = "org.postgresql:postgresql", version = "42.7.13" }
@@ -85,7 +87,7 @@ logging-runtime = ["log4j-core", "log4j-slf4j2"]
 security = ["google-tink", "spring-security-core"]
 security-runtime = ["bouncycastle-prov"]
 
-database = ["exposed-core", "exposed-r2dbc"]
+database = ["exposed-core", "exposed-r2dbc", "exposed-kotlin-datetime", "r2dbc-pool" ]
 database-runtime = ["postgresql", "h2database-h2", "h2database-r2dbc"]
 
 buildsrc = [
