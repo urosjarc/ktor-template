@@ -11,6 +11,7 @@ public data class Pagination(
     val cursor: String? = null,
     val limit: Int = 50
 ) {
+    @Serializable
     public data class Page<T>(
         val data: List<T>,
         val nextCursor: String?

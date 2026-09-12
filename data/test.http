@@ -1,0 +1,444 @@
+@host = http://localhost:8080
+@base = {{host}}/api/v1
+@token = your-token-here
+@contentType = application/json
+
+
+###############################################################################
+# USERS
+###############################################################################
+
+### Get users
+GET {{base}}/users
+Authorization: Bearer {{token}}
+
+
+###############################################################################
+# PAGINATION
+###############################################################################
+
+### First page
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 10
+}
+
+
+### Second page
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 1,
+  "size": 10
+}
+
+
+### Small page
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 2
+}
+
+
+###############################################################################
+# SORTING
+###############################################################################
+
+### Username ASC
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 20,
+  "sort": [
+    {
+      "column": "username",
+      "direction": "ASC"
+    }
+  ]
+}
+
+
+### Username DESC
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 20,
+  "sort": [
+    {
+      "column": "username",
+      "direction": "DESC"
+    }
+  ]
+}
+
+
+### Email ASC
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 20,
+  "sort": [
+    {
+      "column": "email",
+      "direction": "ASC"
+    }
+  ]
+}
+
+
+### Type ASC
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 20,
+  "sort": [
+    {
+      "column": "type",
+      "direction": "ASC"
+    }
+  ]
+}
+
+
+### Multiple sort fields
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 20,
+  "sort": [
+    {
+      "column": "type",
+      "direction": "ASC"
+    },
+    {
+      "column": "username",
+      "direction": "ASC"
+    }
+  ]
+}
+
+
+###############################################################################
+# FILTERING
+###############################################################################
+
+### Find user by username
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 20,
+  "filter": {
+    "column": "username",
+    "operator": "EQ",
+    "value": "admin"
+  }
+}
+
+
+### Username contains
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 20,
+  "filter": {
+    "column": "username",
+    "operator": "CONTAINS",
+    "value": "adm"
+  }
+}
+
+
+### Email contains
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 20,
+  "filter": {
+    "column": "email",
+    "operator": "CONTAINS",
+    "value": "@example.com"
+  }
+}
+
+
+### Find admins
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 20,
+  "filter": {
+    "column": "type",
+    "operator": "EQ",
+    "value": "ADMIN"
+  }
+}
+
+
+### Find customers
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 20,
+  "filter": {
+    "column": "type",
+    "operator": "EQ",
+    "value": "CUSTOMER"
+  }
+}
+
+
+###############################################################################
+# FILTER + SORT
+###############################################################################
+
+### Admins sorted by username
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 10,
+  "sort": [
+    {
+      "column": "username",
+      "direction": "ASC"
+    }
+  ],
+  "filter": {
+    "column": "type",
+    "operator": "EQ",
+    "value": "ADMIN"
+  }
+}
+
+
+### Customers sorted by email
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 10,
+  "sort": [
+    {
+      "column": "email",
+      "direction": "ASC"
+    }
+  ],
+  "filter": {
+    "column": "type",
+    "operator": "EQ",
+    "value": "CUSTOMER"
+  }
+}
+
+
+###############################################################################
+# FILTER + SORT + PAGINATION
+###############################################################################
+
+### Page 0
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 2,
+  "sort": [
+    {
+      "column": "username",
+      "direction": "ASC"
+    }
+  ],
+  "filter": {
+    "column": "type",
+    "operator": "EQ",
+    "value": "CUSTOMER"
+  }
+}
+
+
+### Page 1
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 1,
+  "size": 2,
+  "sort": [
+    {
+      "column": "username",
+      "direction": "ASC"
+    }
+  ],
+  "filter": {
+    "column": "type",
+    "operator": "EQ",
+    "value": "CUSTOMER"
+  }
+}
+
+
+###############################################################################
+# EMPTY RESULTS
+###############################################################################
+
+### Non-existing username
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 20,
+  "filter": {
+    "column": "username",
+    "operator": "EQ",
+    "value": "definitely-not-existing-user"
+  }
+}
+
+
+### Page outside result set
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 9999,
+  "size": 20
+}
+
+
+###############################################################################
+# INVALID REQUESTS
+###############################################################################
+
+### Negative page
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": -1,
+  "size": 10
+}
+
+
+### Zero page size
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 0
+}
+
+
+### Invalid sort column
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 20,
+  "sort": [
+    {
+      "column": "doesNotExist",
+      "direction": "ASC"
+    }
+  ]
+}
+
+
+### Invalid filter column
+POST {{base}}/users/search
+Authorization: Bearer {{token}}
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 20,
+  "filter": {
+    "column": "doesNotExist",
+    "operator": "EQ",
+    "value": "foo"
+  }
+}
+
+
+###############################################################################
+# AUTHENTICATION
+###############################################################################
+
+### No token
+GET {{base}}/users
+
+
+### Invalid token
+GET {{base}}/users
+Authorization: Bearer invalid-token
+
+
+### Search without token
+POST {{base}}/users/search
+Content-Type: {{contentType}}
+
+{
+  "page": 0,
+  "size": 10
+}
+
+
+###############################################################################
+# SWAGGER
+###############################################################################
+
+### Swagger UI
+GET {{host}}/api/docs
