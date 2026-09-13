@@ -1,12 +1,18 @@
 package com.urosjarc.ktor_template.app.repos
 
 import com.urosjarc.ktor_template.app.App
+import com.urosjarc.ktor_template.app.repos.exposed.PaginationCompiler
+import com.urosjarc.ktor_template.app.repos.exposed.UserTable
 import com.urosjarc.ktor_template.core.domain.User
 import com.urosjarc.ktor_template.core.extend.random
+import com.urosjarc.ktor_template.core.types.Pagination
 import kotlinx.coroutines.runBlocking
-import kotlin.test.Test
+import kotlinx.serialization.json.JsonPrimitive
+import org.jetbrains.exposed.v1.r2dbc.R2dbcTransaction
+import org.jetbrains.exposed.v1.r2dbc.selectAll
 import org.junit.jupiter.api.Assertions.*
 import kotlin.test.BeforeTest
+import kotlin.test.Test
 
 /**
  * Test class for UserRepo
@@ -19,6 +25,7 @@ class UserRepoTest {
     fun beforeTest() = runBlocking {
         // Always use createDropDb=true to ensure a clean database for each test
         App.init(inMemoryDb = true, createDropDb = true)
+        App.seed()
     }
 
     @Test
@@ -113,34 +120,34 @@ class UserRepoTest {
      * Skipping upsert operations test as it uses SQL MERGE syntax that's not compatible with H2 in-memory database
      * In a real environment with a full PostgreSQL database, this test would be enabled
      */
-     @Test
-     fun `test upsert operations`() {
-         runBlocking {
-             var user = random<User>()
+    @Test
+    fun `test upsert operations`() {
+        runBlocking {
+            var user = random<User>()
 
-             App.services.db.transaction("USER REPO UPSERT") { tx ->
-                 // UPSERT NEW USER (INSERT)
-                 tx.repos.user.upsert(obj = user)
-                 assertEquals(1, tx.repos.user.select().size)
-                 assertEquals(user.id, tx.repos.user.select(id = user.id)!!.id)
+            App.services.db.transaction("USER REPO UPSERT") { tx ->
+                // UPSERT NEW USER (INSERT)
+                tx.repos.user.upsert(obj = user)
+                assertEquals(1, tx.repos.user.select().size)
+                assertEquals(user.id, tx.repos.user.select(id = user.id)!!.id)
 
-                 // UPSERT EXISTING USER (UPDATE)
-                 val updatedUser = user.copy(username = "upserted_username")
-                 tx.repos.user.upsert(obj = updatedUser)
-                 assertEquals(1, tx.repos.user.select().size)
-                 assertEquals("upserted_username", tx.repos.user.select(id = user.id)!!.username)
+                // UPSERT EXISTING USER (UPDATE)
+                val updatedUser = user.copy(username = "upserted_username")
+                tx.repos.user.upsert(obj = updatedUser)
+                assertEquals(1, tx.repos.user.select().size)
+                assertEquals("upserted_username", tx.repos.user.select(id = user.id)!!.username)
 
-                 // UPSERT MULTIPLE USERS
-                 val user2 = random<User>()
-                 val updatedUser1 = updatedUser.copy(username = "multi_upserted_1")
+                // UPSERT MULTIPLE USERS
+                val user2 = random<User>()
+                val updatedUser1 = updatedUser.copy(username = "multi_upserted_1")
 
-                 tx.repos.user.upsert(objs = listOf(updatedUser1, user2))
-                 assertEquals(2, tx.repos.user.select().size)
-                 assertEquals("multi_upserted_1", tx.repos.user.select(id = user.id)!!.username)
-                 assertEquals(user2.id, tx.repos.user.select(id = user2.id)!!.id)
-             }
-         }
-     }
+                tx.repos.user.upsert(objs = listOf(updatedUser1, user2))
+                assertEquals(2, tx.repos.user.select().size)
+                assertEquals("multi_upserted_1", tx.repos.user.select(id = user.id)!!.username)
+                assertEquals(user2.id, tx.repos.user.select(id = user2.id)!!.id)
+            }
+        }
+    }
 
     @Test
     fun `test delete operations`() {
@@ -180,7 +187,7 @@ class UserRepoTest {
                 tx.repos.user.insert(objs = listOf(user5, user6))
                 assertEquals(2, tx.repos.user.select().size)
 
-                tx.repos.user.deleteId(ids = listOf(user5.id, user6.id))
+                tx.repos.user.deleteIds(ids = listOf(user5.id, user6.id))
                 assertEquals(0, tx.repos.user.select().size)
             }
         }
@@ -207,4 +214,29 @@ class UserRepoTest {
             }
         }
     }
+
+    @Test
+    fun `test select pagination operation`() {
+        runBlocking {
+            App.services.db.transaction("USER REPO SELECT BY PAGINATION") { tx ->
+
+                val compiler = PaginationCompiler(table = UserTable)
+                val pagination = Pagination(
+                    filter = Pagination.Filter.Condition(
+                        column = "type",
+                        operator = Pagination.Filter.Operator.EQ,
+                        value = JsonPrimitive("CUSTOMER"),
+                    ),
+                    limit = 2,
+                )
+                val result = compiler.apply(request = pagination, source = UserTable.selectAll())
+                    .query.prepareSQL(tx.raw as R2dbcTransaction, prepared = false)
+                    .split("WHERE ").last()
+
+                assertEquals("""USERS."type" = 'CUSTOMER' ORDER BY USERS.ID ASC LIMIT 3""", result)
+            }
+
+        }
+    }
+
 }

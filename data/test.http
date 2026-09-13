@@ -286,7 +286,7 @@ Content-Type: {{contentType}}
 
 {
   "page": 0,
-  "size": 2,
+  "limit": 2,
   "sort": [
     {
       "column": "username",
@@ -294,7 +294,7 @@ Content-Type: {{contentType}}
     }
   ],
   "filter": {
-  "type": "condition",
+    "type": "condition",
     "column": "type",
     "operator": "EQ",
     "value": "CUSTOMER"

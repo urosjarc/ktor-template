@@ -9,42 +9,35 @@ import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.r2dbc.Query
 import java.util.*
 
-/**
- * Query metadata for an Exposed table.
- *
- * Every physical table column is queryable. No manual column map is needed;
- * Exposed's Table.columns is used directly.
- */
-public class QueryTable(
-    public val table: Table,
-    public val primaryKey: String,
-    public val defaultSort: List<Pagination.Sort> = listOf(
-        Pagination.Sort(primaryKey, Pagination.Sort.Direction.ASC)
-    )
-) {
-
-    public fun column(
-        name: String
-    ): Column<*> {
-        logger.debug("Resolving column '$name' in table '${table.tableName}'")
-        return table.columns.firstOrNull { it.name == name }
-            ?: run {
-                logger.debug("Column '$name' not found in table '${table.tableName}'")
-                error("Unknown column: $name")
-            }
-    }
+private val Table.primaryKeyName: String get() {
+    return this.primaryKey!!.columns.single().name
 }
 
+private fun Table.column(name: String): Column<*> {
+    logger.debug("Resolving column '$name' in table '${this.tableName}'")
+    return this.columns.firstOrNull { it.name == name }
+        ?: run {
+            logger.debug("Column '$name' not found in table '${this.tableName}'")
+            error("Unknown column: $name")
+        }
+}
+
+private val Table.defaultSort: List<Pagination.Sort>
+    get() {
+        return listOf(Pagination.Sort(this.primaryKeyName, Pagination.Sort.Direction.ASC))
+    }
 
 // ============================================================================
 // PAGINATION COMPILER
 // ============================================================================
 
-public class PaginationCompiler(
-    private val table: QueryTable
-) {
-
+public class PaginationCompiler(private val table: Table) {
     private val json = Json
+
+    public data class Result(
+        val query: Query,
+        val page: Pagination.Page<ResultRow>
+    )
 
     /**
      * Applies:
@@ -59,7 +52,7 @@ public class PaginationCompiler(
     public suspend fun apply(
         request: Pagination,
         source: Query
-    ): Pagination.Page<ResultRow> {
+    ): Result {
         logger.debug("Applying pagination: limit=${request.limit}, sort=${request.sort}, cursor=${request.cursor}, filter=${request.filter}")
 
         require(request.limit > 0) {
@@ -95,7 +88,7 @@ public class PaginationCompiler(
         logger.debug("Combined predicates count: ${predicates.size}")
 
         logger.debug("Executing query with limit: ${request.limit + 1}")
-        val rows =
+        val query =
             source
                 .where {
                     when {
@@ -105,8 +98,8 @@ public class PaginationCompiler(
                 }
                 .orderBy(*compileSort(sort))
                 .limit(request.limit + 1)
-                .toList()
 
+        val rows = query.toList()
         val hasNext = rows.size > request.limit
         logger.debug("Query returned ${rows.size} rows (limit=${request.limit}, hasNext=$hasNext)")
 
@@ -131,9 +124,12 @@ public class PaginationCompiler(
 
         logger.debug("Pagination result: page size=${page.size}, nextCursor=$nextCursor")
 
-        return Pagination.Page(
-            data = page,
-            nextCursor = nextCursor
+        return Result(
+            query = query,
+            page = Pagination.Page(
+                data = page,
+                nextCursor = nextCursor,
+            )
         )
     }
 
@@ -154,11 +150,11 @@ public class PaginationCompiler(
                 requested
             }
 
-        val result = if (sort.any { it.column == table.primaryKey }) {
+        val result = if (sort.any { it.column == table.primaryKeyName }) {
             sort
         } else {
             sort + Pagination.Sort(
-                column = table.primaryKey,
+                column = table.primaryKeyName,
                 direction = Pagination.Sort.Direction.ASC
             )
         }
@@ -786,16 +782,25 @@ public class PaginationCompiler(
         column: Column<*>,
         value: String
     ): Any {
+        val columnType = column.columnType
 
-        val sqlType =
-            column.columnType
-                .sqlType()
-                .uppercase()
-                .trim()
+        if (columnType is EnumerationNameColumnType<*>) {
+            val enumClass = columnType.klass.java
 
-        logger.debug("Parsing string value '$value' for column '${column.name}' with SQL type '$sqlType'")
+            return enumClass.enumConstants
+                ?.firstOrNull { it.name == value }
+                ?: error(
+                    "Invalid value '$value' for enum column '${column.name}'. " +
+                            "Expected one of: ${enumClass.enumConstants?.joinToString()}"
+                )
+        }
 
-        val result = when {
+        val sqlType = columnType
+            .sqlType()
+            .uppercase()
+            .trim()
+
+        return when {
             sqlType.startsWith("VARCHAR") ||
                     sqlType.startsWith("CHAR") ||
                     sqlType.startsWith("TEXT") ||
@@ -830,16 +835,11 @@ public class PaginationCompiler(
             sqlType.startsWith("UUID") ->
                 UUID.fromString(value)
 
-            else -> {
-                logger.debug("Unsupported query column type '$sqlType' for column '${column.name}'")
-                error(
-                    "Unsupported query column type " +
-                            "${column.columnType.sqlType()} " +
-                            "for column ${column.name}"
-                )
-            }
+            else -> error(
+                "Unsupported query column type " +
+                        "${column.columnType.sqlType()} " +
+                        "for column ${column.name}"
+            )
         }
-        logger.debug("Parsed value for column '${column.name}': $result (${result::class.simpleName})")
-        return result
     }
 }

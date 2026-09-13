@@ -20,6 +20,7 @@ public interface DbService {
 
     public interface Transaction {
         public val repos: Repos
+        public val raw: Any
         public suspend fun commit()
         public suspend fun rollback()
     }

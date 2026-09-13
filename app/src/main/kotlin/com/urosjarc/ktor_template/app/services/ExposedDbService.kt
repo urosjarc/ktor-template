@@ -45,6 +45,7 @@ internal class ExposedDbService(private val statsSize: Long) : DbService {
 
 
     private class ExposedRepos(private val tx: R2dbcTransaction) : DbService.Transaction {
+        override val raw: Any = tx
 
         private var isCompleted = false
 

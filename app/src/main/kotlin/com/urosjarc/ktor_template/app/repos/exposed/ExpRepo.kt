@@ -21,57 +21,30 @@ internal abstract class ExpTable<T>(name: String) : UuidTable(name, uuidVersion 
     val updatedAt = timestampWithTimeZone("updated_at")
     abstract fun toDomain(row: ResultRow): T
     abstract fun toRow(tx: UpdateBuilder<Int>, domain: T)
+    val paginationCompiler: PaginationCompiler get() = PaginationCompiler(this)
 }
-
-
-internal val queryTable = QueryTable(
-    table = UserTable,
-    primaryKey = "id",
-    defaultSort = listOf(
-        Pagination.Sort(
-            column = "id",
-            direction = Pagination.Sort.Direction.ASC
-        )
-    ),
-)
 
 internal open class ExpRepo<T : Domain<T>>(val table: ExpTable<T>) : Repo<T> {
     override suspend fun createTable() {
         SchemaUtils.create(table)
     }
 
-    override suspend fun count(): Long =
-        table.selectAll().count()
+    override suspend fun count(): Long = table.selectAll().count()
 
-    override suspend fun select(): List<T> =
-        table
-            .selectAll()
-            .map(table::toDomain)
-            .toList()
+    override suspend fun select(): List<T> = table.selectAll().map(table::toDomain).toList()
 
-    override suspend fun select(id: Id<T>): T? =
-        table
-            .selectAll()
-            .where { table.id eq id.value }
-            .singleOrNull()
-            ?.let(table::toDomain)
+    override suspend fun select(id: Id<T>): T? = table.selectAll().where { table.id eq id.value }.singleOrNull()?.let(table::toDomain)
 
     override suspend fun select(ids: List<Id<T>>): List<T> {
         if (ids.isEmpty()) return emptyList()
-        return table
-            .selectAll()
-            .where { table.id inList ids.map { it.value } }
-            .map(table::toDomain)
-            .toList()
+        return table.selectAll().where { table.id inList ids.map { it.value } }.map(table::toDomain).toList()
     }
 
     override suspend fun select(pagination: Pagination): Pagination.Page<T> {
-        val page =
-            PaginationCompiler(table = queryTable).apply(request = pagination, source = table.selectAll())
-
-        return Pagination.Page<T>(
-            data = page.data.map(table::toDomain),
-            nextCursor = page.nextCursor
+        val result = PaginationCompiler(table = table).apply(request = pagination, source = table.selectAll())
+        return Pagination.Page(
+            data = result.page.data.map(table::toDomain),
+            nextCursor = result.page.nextCursor,
         )
     }
 

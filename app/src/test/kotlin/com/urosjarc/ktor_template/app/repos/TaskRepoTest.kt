@@ -206,7 +206,7 @@ class TaskRepoTest {
                 tx.repos.task.insert(objs = listOf(task5, task6))
                 assertEquals(2, tx.repos.task.select().size)
 
-                tx.repos.task.deleteId(ids = listOf(task5.id, task6.id))
+                tx.repos.task.deleteIds(ids = listOf(task5.id, task6.id))
                 assertEquals(0, tx.repos.task.select().size)
             }
         }
