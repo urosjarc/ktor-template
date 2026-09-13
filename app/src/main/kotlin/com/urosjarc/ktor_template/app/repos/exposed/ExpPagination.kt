@@ -4,6 +4,7 @@ import com.urosjarc.ktor_template.core.types.Pagination
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import org.apache.logging.log4j.kotlin.logger
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.r2dbc.Query
 import java.util.*
@@ -24,9 +25,14 @@ public class QueryTable(
 
     public fun column(
         name: String
-    ): Column<*> =
-        table.columns.firstOrNull { it.name == name }
-            ?: error("Unknown column: $name")
+    ): Column<*> {
+        logger.debug("Resolving column '$name' in table '${table.tableName}'")
+        return table.columns.firstOrNull { it.name == name }
+            ?: run {
+                logger.debug("Column '$name' not found in table '${table.tableName}'")
+                error("Unknown column: $name")
+            }
+    }
 }
 
 
@@ -54,18 +60,24 @@ public class PaginationCompiler(
         request: Pagination,
         source: Query
     ): Pagination.Page<ResultRow> {
+        logger.debug("Applying pagination: limit=${request.limit}, sort=${request.sort}, cursor=${request.cursor}, filter=${request.filter}")
 
         require(request.limit > 0) {
             "limit must be greater than zero"
         }
 
         val sort = normalizeSort(request.sort)
+        logger.debug("Normalized sort order: $sort")
+
         val cursor = request.cursor?.let(::decodeCursor)
+        logger.debug("Decoded cursor: $cursor")
 
         validateCursor(sort, cursor)
+        logger.debug("Cursor validation passed")
 
         val filterExpression =
             request.filter?.let(::compileFilter)
+        logger.debug("Compiled filter expression: $filterExpression")
 
         val cursorExpression =
             cursor?.let {
@@ -74,12 +86,15 @@ public class PaginationCompiler(
                     cursor = it
                 )
             }
+        logger.debug("Compiled cursor expression: $cursorExpression")
 
         val predicates = buildList {
             filterExpression?.let(::add)
             cursorExpression?.let(::add)
         }
+        logger.debug("Combined predicates count: ${predicates.size}")
 
+        logger.debug("Executing query with limit: ${request.limit + 1}")
         val rows =
             source
                 .where {
@@ -93,6 +108,7 @@ public class PaginationCompiler(
                 .toList()
 
         val hasNext = rows.size > request.limit
+        logger.debug("Query returned ${rows.size} rows (limit=${request.limit}, hasNext=$hasNext)")
 
         val page =
             if (hasNext) {
@@ -113,6 +129,8 @@ public class PaginationCompiler(
                 null
             }
 
+        logger.debug("Pagination result: page size=${page.size}, nextCursor=$nextCursor")
+
         return Pagination.Page(
             data = page,
             nextCursor = nextCursor
@@ -127,6 +145,7 @@ public class PaginationCompiler(
     private fun normalizeSort(
         requested: List<Pagination.Sort>
     ): List<Pagination.Sort> {
+        logger.debug("Normalizing sort: requested=$requested, defaultSort=${table.defaultSort}, primaryKey=${table.primaryKey}")
 
         val sort =
             if (requested.isEmpty()) {
@@ -135,7 +154,7 @@ public class PaginationCompiler(
                 requested
             }
 
-        return if (sort.any { it.column == table.primaryKey }) {
+        val result = if (sort.any { it.column == table.primaryKey }) {
             sort
         } else {
             sort + Pagination.Sort(
@@ -143,18 +162,26 @@ public class PaginationCompiler(
                 direction = Pagination.Sort.Direction.ASC
             )
         }
+        logger.debug("Sort normalization resolved to: $result")
+        return result
     }
 
 
     private fun compileSort(
         sort: List<Pagination.Sort>
-    ): Array<Pair<Column<*>, SortOrder>> =
-        sort.map { item ->
-            table.column(item.column) to when (item.direction) {
+    ): Array<Pair<Column<*>, SortOrder>> {
+        logger.debug("Compiling sort clauses: $sort")
+        val compiled = sort.map { item ->
+            val col = table.column(item.column)
+            val order = when (item.direction) {
                 Pagination.Sort.Direction.ASC -> SortOrder.ASC
                 Pagination.Sort.Direction.DESC -> SortOrder.DESC
             }
+            logger.debug("Sort clause: column=${col.name}, order=$order")
+            col to order
         }.toTypedArray()
+        return compiled
+    }
 
 
     // ========================================================================
@@ -163,12 +190,16 @@ public class PaginationCompiler(
 
     private fun compileFilter(
         filter: Pagination.Filter
-    ): Op<Boolean> =
-        when (filter) {
-            is Pagination.Filter.Condition ->
+    ): Op<Boolean> {
+        logger.debug("Compiling filter: $filter")
+        return when (filter) {
+            is Pagination.Filter.Condition -> {
+                logger.debug("Compiling filter condition: column=${filter.column}, operator=${filter.operator}, value=${filter.value}")
                 compileCondition(filter)
+            }
 
             is Pagination.Filter.And -> {
+                logger.debug("Compiling AND filter with ${filter.filters.size} sub-filters")
                 require(filter.filters.isNotEmpty()) {
                     "AND requires at least one filter"
                 }
@@ -179,6 +210,7 @@ public class PaginationCompiler(
             }
 
             is Pagination.Filter.Or -> {
+                logger.debug("Compiling OR filter with ${filter.filters.size} sub-filters")
                 require(filter.filters.isNotEmpty()) {
                     "OR requires at least one filter"
                 }
@@ -188,13 +220,14 @@ public class PaginationCompiler(
                     .compoundOr()
             }
         }
+    }
 
 
     private fun compileCondition(
         condition: Pagination.Filter.Condition
     ): Op<Boolean> {
-
         val column = table.column(condition.column)
+        logger.debug("Compiling condition on column '${column.name}' with operator '${condition.operator}' and value '${condition.value}'")
 
         return when (condition.operator) {
             Pagination.Filter.Operator.EQ ->
@@ -295,27 +328,31 @@ public class PaginationCompiler(
     private fun requiredValue(
         column: Column<*>,
         condition: Pagination.Filter.Condition
-    ): Any =
-        condition.value?.let {
+    ): Any {
+        logger.debug("Extracting required value for condition '${condition.operator}' on column '${column.name}' from '${condition.value}'")
+        return condition.value?.let {
             parseValue(column, it)
         } ?: error(
             "Operator ${condition.operator} requires a value"
         )
+    }
 
 
     private fun requiredPrimitive(
         condition: Pagination.Filter.Condition
-    ): JsonPrimitive =
-        condition.value?.jsonPrimitive ?: error(
+    ): JsonPrimitive {
+        logger.debug("Extracting required primitive for condition '${condition.operator}' on column '${condition.column}' from '${condition.value}'")
+        return condition.value?.jsonPrimitive ?: error(
             "Operator ${condition.operator} requires a value"
         )
+    }
 
 
     private fun between(
         column: Column<*>,
         value: JsonElement?
     ): Op<Boolean> {
-
+        logger.debug("Building BETWEEN predicate for column '${column.name}' with value: $value")
         val array =
             value as? JsonArray ?: error(
                 "BETWEEN requires [from, to]"
@@ -327,6 +364,7 @@ public class PaginationCompiler(
 
         val from = parseValue(column, array[0])
         val to = parseValue(column, array[1])
+        logger.debug("Parsed BETWEEN range for column '${column.name}': from=$from, to=$to")
 
         return object : Op<Boolean>() {
 
@@ -359,11 +397,11 @@ public class PaginationCompiler(
         value: JsonElement?,
         negate: Boolean
     ): Op<Boolean> {
-
+        val opName = if (negate) Pagination.Filter.Operator.NOT_IN else Pagination.Filter.Operator.IN
+        logger.debug("Building $opName predicate for column '${column.name}' with value: $value")
         val array =
             value as? JsonArray ?: error(
-                "${if (negate) Pagination.Filter.Operator.NOT_IN else Pagination.Filter.Operator.IN} " +
-                        "requires an array"
+                "$opName requires an array"
             )
 
         require(array.isNotEmpty()) {
@@ -373,6 +411,7 @@ public class PaginationCompiler(
         val values = array.map {
             parseValue(column, it)
         }
+        logger.debug("Parsed $opName values for column '${column.name}': $values")
 
         return object : Op<Boolean>() {
 
@@ -410,8 +449,9 @@ public class PaginationCompiler(
     private fun nullComparison(
         column: Column<*>,
         isNull: Boolean
-    ): Op<Boolean> =
-        object : Op<Boolean>() {
+    ): Op<Boolean> {
+        logger.debug("Building null comparison for column '${column.name}': isNull=$isNull")
+        return object : Op<Boolean>() {
 
             override fun toQueryBuilder(
                 queryBuilder: QueryBuilder
@@ -426,6 +466,7 @@ public class PaginationCompiler(
                 )
             }
         }
+    }
 
 
     @Suppress("UNCHECKED_CAST")
@@ -433,8 +474,9 @@ public class PaginationCompiler(
         column: Column<*>,
         operator: String,
         value: Any
-    ): Op<Boolean> =
-        object : Op<Boolean>() {
+    ): Op<Boolean> {
+        logger.debug("Building comparison predicate: ${column.name} $operator $value")
+        return object : Op<Boolean>() {
 
             override fun toQueryBuilder(
                 queryBuilder: QueryBuilder
@@ -449,17 +491,20 @@ public class PaginationCompiler(
                 )
             }
         }
+    }
 
 
     private fun like(
         column: Column<*>,
         value: String
-    ): Op<Boolean> =
-        comparison(
+    ): Op<Boolean> {
+        logger.debug("Building LIKE predicate for column '${column.name}' with pattern '$value'")
+        return comparison(
             column = column,
             operator = "LIKE",
             value = value
         )
+    }
 
 
     @Suppress("UNCHECKED_CAST")
@@ -468,6 +513,7 @@ public class PaginationCompiler(
         column: Column<*>,
         value: Any?
     ) {
+        logger.debug("Registering SQL argument for column '${column.name}' (${column.columnType.sqlType()}): $value")
         queryBuilder.registerArgument(
             column.columnType as IColumnType<Any>,
             value
@@ -496,15 +542,18 @@ public class PaginationCompiler(
         sort: List<Pagination.Sort>,
         row: ResultRow
     ): String {
+        logger.debug("Encoding cursor for sort: $sort")
 
         val values = sort.map { item ->
-            val value = row[table.column(item.column)]
+            val col = table.column(item.column)
+            val value = row[col]
 
             require(value != null) {
                 "Cannot create a cursor from a NULL sort value " +
                         "for column ${item.column}"
             }
 
+            logger.debug("Extracted sort value for column '${item.column}': $value")
             value.toString()
         }
 
@@ -516,28 +565,35 @@ public class PaginationCompiler(
 
         val jsonValue =
             json.encodeToString(payload)
+        logger.debug("Cursor payload JSON: $jsonValue")
 
-        return Base64
+        val encoded = Base64
             .getUrlEncoder()
             .withoutPadding()
             .encodeToString(
                 jsonValue.toByteArray(Charsets.UTF_8)
             )
+        logger.debug("Encoded cursor string: $encoded")
+        return encoded
     }
 
 
     private fun decodeCursor(
         value: String
     ): Cursor {
+        logger.debug("Decoding cursor string: $value")
 
         val decoded = try {
-            String(
+            val s = String(
                 Base64
                     .getUrlDecoder()
                     .decode(value),
                 Charsets.UTF_8
             )
+            logger.debug("Decoded Base64 cursor to JSON: $s")
+            s
         } catch (cause: IllegalArgumentException) {
+            logger.debug("Failed to decode Base64 cursor: $value", cause)
             throw IllegalArgumentException(
                 "Invalid pagination cursor",
                 cause
@@ -547,16 +603,19 @@ public class PaginationCompiler(
         val payload = try {
             json.decodeFromString<CursorPayload>(decoded)
         } catch (cause: Exception) {
+            logger.debug("Failed to deserialize cursor payload JSON: $decoded", cause)
             throw IllegalArgumentException(
                 "Invalid pagination cursor",
                 cause
             )
         }
 
-        return Cursor(
+        val cursor = Cursor(
             sort = payload.sort,
             values = payload.values
         )
+        logger.debug("Successfully decoded cursor: $cursor")
+        return cursor
     }
 
 
@@ -564,8 +623,10 @@ public class PaginationCompiler(
         sort: List<Pagination.Sort>,
         cursor: Cursor?
     ) {
+        logger.debug("Validating cursor: $cursor against sort: $sort")
 
         if (cursor == null) {
+            logger.debug("Cursor is null, validation skipped")
             return
         }
 
@@ -577,6 +638,7 @@ public class PaginationCompiler(
             "Cursor contains ${cursor.values.size} values " +
                     "but sort contains ${sort.size} columns"
         }
+        logger.debug("Cursor validation successful")
     }
 
 
@@ -604,6 +666,7 @@ public class PaginationCompiler(
         sort: List<Pagination.Sort>,
         cursor: Cursor
     ): Op<Boolean> {
+        logger.debug("Compiling keyset cursor predicate for sort: $sort, cursor: $cursor")
 
         val branches = sort.indices.map { index ->
 
@@ -625,13 +688,16 @@ public class PaginationCompiler(
                         val previousColumn =
                             table.column(previousSort.column)
 
+                        val parsedPrevValue = parseCursorValue(
+                            previousColumn,
+                            previousValue
+                        )
+                        logger.debug("Cursor branch $index: equality on column '${previousColumn.name}' = $parsedPrevValue")
+
                         comparison(
                             column = previousColumn,
                             operator = "=",
-                            value = parseCursorValue(
-                                previousColumn,
-                                previousValue
-                            )
+                            value = parsedPrevValue
                         )
                     }
 
@@ -654,20 +720,24 @@ public class PaginationCompiler(
                     Pagination.Sort.Direction.DESC -> "<"
                 }
 
+            val parsedCurrValue = parseCursorValue(
+                currentColumn,
+                currentValue
+            )
+            logger.debug("Cursor branch $index: comparison on column '${currentColumn.name}' $operator $parsedCurrValue")
+
             val currentComparison =
                 comparison(
                     column = currentColumn,
                     operator = operator,
-                    value = parseCursorValue(
-                        currentColumn,
-                        currentValue
-                    )
+                    value = parsedCurrValue
                 )
 
             (equalities + currentComparison)
                 .compoundAnd()
         }
 
+        logger.debug("Compiled ${branches.size} cursor branches into compound OR")
         return branches.compoundOr()
     }
 
@@ -692,6 +762,7 @@ public class PaginationCompiler(
         column: Column<*>,
         value: JsonElement
     ): Any {
+        logger.debug("Parsing JSON element value for column '${column.name}': $value")
         return parseStringValue(
             column = column,
             value = value.jsonPrimitive.content
@@ -703,6 +774,7 @@ public class PaginationCompiler(
         column: Column<*>,
         value: String
     ): Any {
+        logger.debug("Parsing cursor string value for column '${column.name}': $value")
         return parseStringValue(
             column = column,
             value = value
@@ -721,7 +793,9 @@ public class PaginationCompiler(
                 .uppercase()
                 .trim()
 
-        return when {
+        logger.debug("Parsing string value '$value' for column '${column.name}' with SQL type '$sqlType'")
+
+        val result = when {
             sqlType.startsWith("VARCHAR") ||
                     sqlType.startsWith("CHAR") ||
                     sqlType.startsWith("TEXT") ||
@@ -756,12 +830,16 @@ public class PaginationCompiler(
             sqlType.startsWith("UUID") ->
                 UUID.fromString(value)
 
-            else ->
+            else -> {
+                logger.debug("Unsupported query column type '$sqlType' for column '${column.name}'")
                 error(
                     "Unsupported query column type " +
                             "${column.columnType.sqlType()} " +
                             "for column ${column.name}"
                 )
+            }
         }
+        logger.debug("Parsed value for column '${column.name}': $result (${result::class.simpleName})")
+        return result
     }
 }

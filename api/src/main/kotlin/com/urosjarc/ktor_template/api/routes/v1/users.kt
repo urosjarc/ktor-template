@@ -22,7 +22,7 @@ import kotlinx.coroutines.delay
 @Resource("users")
 class users {
     @Resource("search")
-    class search(val parent: users, val pagination: Pagination)
+    class search(val parent: users)
 
     @Resource("{id}")
     class id(val parent: users, val id: Id<User>)
@@ -34,7 +34,8 @@ fun Route.usersRoutes() {
         this.call.respond(users)
     }
     post<users.search> {
-        val users = App.services.db.transaction("SEARCH USERS") { tx -> tx.repos.user.select(pagination = it.pagination) }
+        val pagination = this.call.receive<Pagination>()
+        val users = App.services.db.transaction("SEARCH USERS") { tx -> tx.repos.user.select(pagination = pagination) }
         this.call.respond(users)
     }
     post<users> {
