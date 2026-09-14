@@ -1,6 +1,7 @@
 package com.urosjarc.ktor_template.core.serializers
 
 import com.urosjarc.ktor_template.core.types.Hashed
+import com.urosjarc.ktor_template.core.types.hashed
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -12,7 +13,7 @@ public object HashedSerializer : KSerializer<Hashed> {
 	override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Hashed", PrimitiveKind.STRING)
 
 	override fun deserialize(decoder: Decoder): Hashed {
-		return Hashed(value = decoder.decodeString().encodeToByteArray())
+		return decoder.decodeString().hashed()
 	}
 
 	override fun serialize(encoder: Encoder, value: Hashed) {

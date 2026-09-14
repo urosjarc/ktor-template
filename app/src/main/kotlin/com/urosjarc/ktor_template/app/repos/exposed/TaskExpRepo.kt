@@ -35,7 +35,7 @@ internal object TaskTable : ExpTable<Task>("tasks") {
     }
 }
 
-internal object TaskExpRepo : Repo<Task>, TaskRepo, ExpRepo<Task>(table = TaskTable) {
+internal object TaskExpRepo : Repo<Task>, TaskRepo, ExpRepo<Task>(table = TaskTable, serializer = Task.serializer()) {
     override suspend fun selectUserTasks(id: Id<User>): List<Task> =
         TaskTable
             .selectAll()

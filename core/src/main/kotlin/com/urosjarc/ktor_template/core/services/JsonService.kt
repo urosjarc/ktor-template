@@ -10,7 +10,7 @@ import com.urosjarc.ktor_template.core.types.TimeZoned
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 
-public class JsonService(prettyPrint: Boolean = false) {
+public object JsonService {
     public val module: Json =
         Json {
             serializersModule =
@@ -21,7 +21,7 @@ public class JsonService(prettyPrint: Boolean = false) {
                     contextual(Hashed::class, HashedSerializer)
                 }
             this.encodeDefaults = true
-            this.prettyPrint = prettyPrint
+            this.prettyPrint = false
             this.isLenient = true
             this.allowSpecialFloatingPointValues = true
             this.ignoreUnknownKeys = true

@@ -75,12 +75,16 @@ public data class PaginationField<T>(
         get() = paginationType ?: PaginationType.from(expression.columnType)
 }
 
+public data class PaginationEntity(
+    public val resource: String,
+    public val primaryKey: String,
+)
+
 public data class PaginationDefinition(
-    public val fields: Map<String, PaginationField<*>>,
     public val uniqueKey: List<String> = listOf("id"),
-    public val defaultSort: List<Pagination.Sort> = uniqueKey.map {
-        Pagination.Sort(it, Pagination.Sort.Direction.ASC)
-    },
+    public val entities: List<PaginationEntity> = emptyList(),
+    public val defaultSort: List<Pagination.Sort> = uniqueKey.map { Pagination.Sort(it, Pagination.Sort.Direction.ASC) },
+    public val fields: Map<String, PaginationField<*>>,
 ) {
     init {
         require(fields.isNotEmpty()) { "Pagination definition must contain at least one field" }

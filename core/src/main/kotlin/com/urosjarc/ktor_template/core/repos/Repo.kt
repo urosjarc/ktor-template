@@ -2,8 +2,12 @@ package com.urosjarc.ktor_template.core.repos
 
 import com.urosjarc.ktor_template.core.types.Id
 import com.urosjarc.ktor_template.core.types.Pagination
+import kotlinx.serialization.json.JsonObject
 
 public interface Repo<T> {
+    public val tableName: String
+    public fun decode(json: JsonObject): T
+
     public suspend fun createTable()
     public suspend fun count(): Long
 

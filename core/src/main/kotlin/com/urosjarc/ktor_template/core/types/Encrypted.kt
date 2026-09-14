@@ -6,7 +6,7 @@ import com.google.crypto.tink.KeysetHandle
 import com.google.crypto.tink.TinkJsonProtoKeysetFormat
 import com.google.crypto.tink.daead.DeterministicAeadConfig
 import com.urosjarc.ktor_template.core.Env
-import kotlinx.serialization.Contextual
+import com.urosjarc.ktor_template.core.serializers.EncryptedSerializer
 import kotlinx.serialization.Serializable
 import kotlin.io.encoding.Base64
 
@@ -23,7 +23,7 @@ public fun String.encrypted(): Encrypted {
 }
 
 @JvmInline
-@Serializable
+@Serializable(with = EncryptedSerializer::class)
 public value class Encrypted(
     public val value: ByteArray,
 ) {

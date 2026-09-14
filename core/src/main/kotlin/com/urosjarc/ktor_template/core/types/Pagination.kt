@@ -56,6 +56,7 @@ public data class Pagination(
         }
     }
 
+    @Serializable
     public data class Page<T>(
         val data: List<T>,
         val nextCursor: String?,

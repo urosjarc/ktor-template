@@ -2,11 +2,14 @@ package com.urosjarc.ktor_template.app.repos.exposed
 
 import com.urosjarc.ktor_template.core.domain.Domain
 import com.urosjarc.ktor_template.core.repos.Repo
+import com.urosjarc.ktor_template.core.services.JsonService
 import com.urosjarc.ktor_template.core.types.Id
 import com.urosjarc.ktor_template.core.types.Pagination
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.singleOrNull
 import kotlinx.coroutines.flow.toList
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.json.JsonObject
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.dao.id.UuidTable
 import org.jetbrains.exposed.v1.core.eq
@@ -24,10 +27,14 @@ internal abstract class ExpTable<T>(name: String) : UuidTable(name, uuidVersion 
     abstract fun toRow(tx: UpdateBuilder<Int>, domain: T)
 }
 
-internal open class ExpRepo<T : Domain<T>>(val table: ExpTable<T>) : Repo<T> {
+internal open class ExpRepo<T : Domain<T>>(val table: ExpTable<T>, val serializer: KSerializer<T>) : Repo<T> {
+    override val tableName: String = table.tableName
+
     override suspend fun createTable() {
         SchemaUtils.create(table)
     }
+
+    override fun decode(json: JsonObject): T = JsonService.module.decodeFromJsonElement(serializer, json)
 
     override suspend fun count(): Long = table.selectAll().count()
 

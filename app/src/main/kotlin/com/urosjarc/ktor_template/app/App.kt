@@ -37,7 +37,7 @@ public object App {
 
         // SERVICES
         services.db = ExposedDbService(statsSize = 1_000_000)
-        services.json = JsonService()
+        services.json = JsonService
         services.jwt = TinkeyJwtService(privateKeyset = Env.KEYSET_JWT)
         // SERVICES
 

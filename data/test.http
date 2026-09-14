@@ -301,6 +301,9 @@ Content-Type: {{contentType}}
   }
 }
 
+### Page xasdf
+GET {{base}}/entities/users
+Content-Type: {{contentType}}
 
 ### Page 1
 POST {{base}}/users/search
@@ -443,3 +446,24 @@ Content-Type: {{contentType}}
 
 ### Swagger UI
 GET {{host}}/api/docs
+
+### Create user
+POST http://localhost:8080/api/v1/entities/users
+Content-Type: application/json
+
+{
+  "username": "created_user",
+  "password": "password",
+  "email": "created@example.com",
+  "type": "CUSTOMER"
+}
+
+### Get users
+GET http://localhost:8080/api/v1/entities/users
+
+### Get user
+GET http://localhost:8080/api/v1/entities/users/01a0a1ea-d54c-759b-8c06-49e5e247dc61
+
+### Update user
+PUT http://localhost:8080/api/v1/entities/users/01a0a1ea-d54c-759b-8c06-49e5e247dc61
+Content-Type: application/json
