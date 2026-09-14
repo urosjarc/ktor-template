@@ -1,50 +1,82 @@
 package com.urosjarc.ktor_template.app.repos.exposed
 
-import com.urosjarc.ktor_template.core.types.Pagination
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.r2dbc.Query
-import org.jetbrains.exposed.v1.r2dbc.R2dbcDatabase
-import org.jetbrains.exposed.v1.r2dbc.SchemaUtils
-import org.jetbrains.exposed.v1.r2dbc.insert
-import org.jetbrains.exposed.v1.r2dbc.selectAll
-import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
-import java.math.BigDecimal
-import java.util.Base64
-import java.util.UUID
+import java.util.*
 
-public enum class PaginationType {
-    STRING,
-    INTEGER,
-    DECIMAL,
-    BOOLEAN,
-    UUID,
-    DATE,
-    DATETIME,
-    ENCRYPTED,
-    HASHED,
-    BINARY;
-
-    public companion object {
-        public fun from(columnType: IColumnType<*>): PaginationType =
-            when (columnType) {
-                is ColumnType<String> -> STRING
-                is ColumnType<Int> -> INTEGER
-                is ColumnType<BigDecimal> -> DECIMAL
-                is ColumnType<Boolean> -> BOOLEAN
-                is ColumnType<UUID> -> UUID
-                is ColumnType<Date> -> DATE
-                is ColumnType<DateTime> -> DATETIME
-                else -> BINARY
-            }
+/**
+ * Request sent by the client.
+ *
+ * The frontend may keep filter/sort state in the URL, while [cursor] remains
+ * transient API state in the POST body.
+ */
+@Serializable
+public data class Pagination(
+    val limit: Int = 20,
+    val sort: List<Sort> = emptyList(),
+    val filter: Filter? = null,
+    val cursor: String? = null,
+) {
+    @Serializable
+    public data class Sort(
+        val column: String,
+        val direction: Direction = Direction.ASC,
+    ) {
+        @Serializable
+        public enum class Direction {
+            ASC,
+            DESC,
+        }
     }
+
+    @Serializable
+    public sealed interface Filter {
+        @Serializable
+        public data class Condition(
+            val column: String,
+            val operator: Operator,
+            val value: JsonElement? = null,
+        ) : Filter
+
+        @Serializable
+        public data class And(
+            val filters: List<Filter>,
+        ) : Filter
+
+        @Serializable
+        public data class Or(
+            val filters: List<Filter>,
+        ) : Filter
+
+        @Serializable
+        public enum class Operator {
+            EQ,
+            NE,
+            GT,
+            GTE,
+            LT,
+            LTE,
+            BETWEEN,
+            CONTAINS,
+            STARTS_WITH,
+            ENDS_WITH,
+            IN,
+            NOT_IN,
+            IS_NULL,
+            IS_NOT_NULL,
+        }
+    }
+
+    public data class Page<T>(
+        val data: List<T>,
+        val nextCursor: String?,
+    )
 }
 
 /**
@@ -65,13 +97,10 @@ public enum class PaginationType {
  * used for sorting or if a cursor has to be created from it.
  */
 public data class PaginationField<T>(
-    public val expression: ExpressionWithColumnType<T>,
-    public val paginationType: PaginationType? = null,
+    public val expression: Expression<T>,
+    public val columnType: IColumnType<T & Any>,
     public val filterPlacement: FilterPlacement = FilterPlacement.WHERE,
-) {
-    public val resolvedPaginationType: PaginationType
-        get() = paginationType ?: PaginationType.from(expression.columnType)
-}
+)
 
 public enum class FilterPlacement {
     WHERE,
@@ -87,7 +116,7 @@ public enum class FilterPlacement {
  */
 public data class PaginationDefinition(
     public val fields: Map<String, PaginationField<*>>,
-    public val uniqueKey: List<String> = listOf("id"),
+    public val uniqueKey: List<String>,
     public val defaultSort: List<Pagination.Sort> = uniqueKey.map {
         Pagination.Sort(it, Pagination.Sort.Direction.ASC)
     },
@@ -111,11 +140,10 @@ public data class PaginationDefinition(
         public fun <T> field(
             expression: ExpressionWithColumnType<T>,
             filterPlacement: FilterPlacement = FilterPlacement.WHERE,
-            paginationType: PaginationType? = null,
         ): PaginationField<T> = PaginationField(
             expression = expression,
+            columnType = expression.columnType,
             filterPlacement = filterPlacement,
-            paginationType = paginationType,
         )
     }
 }
@@ -419,30 +447,30 @@ public class PaginationCompiler(
 
         return when (condition.operator) {
             Pagination.Filter.Operator.EQ ->
-                comparison(expression, field.expression.columnType, "=", requiredValue(field, condition))
+                comparison(expression, field.columnType, "=", requiredValue(field, condition))
 
             Pagination.Filter.Operator.NE ->
-                comparison(expression, field.expression.columnType, "<>", requiredValue(field, condition))
+                comparison(expression, field.columnType, "<>", requiredValue(field, condition))
 
             Pagination.Filter.Operator.GT ->
-                comparison(expression, field.expression.columnType, ">", requiredValue(field, condition))
+                comparison(expression, field.columnType, ">", requiredValue(field, condition))
 
             Pagination.Filter.Operator.GTE ->
-                comparison(expression, field.expression.columnType, ">=", requiredValue(field, condition))
+                comparison(expression, field.columnType, ">=", requiredValue(field, condition))
 
             Pagination.Filter.Operator.LT ->
-                comparison(expression, field.expression.columnType, "<", requiredValue(field, condition))
+                comparison(expression, field.columnType, "<", requiredValue(field, condition))
 
             Pagination.Filter.Operator.LTE ->
-                comparison(expression, field.expression.columnType, "<=", requiredValue(field, condition))
+                comparison(expression, field.columnType, "<=", requiredValue(field, condition))
 
             Pagination.Filter.Operator.BETWEEN ->
-                between(expression, field.expression.columnType, condition.value)
+                between(expression, field.columnType, condition.value)
 
             Pagination.Filter.Operator.CONTAINS ->
                 comparison(
                     expression,
-                    field.expression.columnType,
+                    field.columnType,
                     "LIKE",
                     "%${requiredPrimitive(condition).content}%",
                 )
@@ -450,7 +478,7 @@ public class PaginationCompiler(
             Pagination.Filter.Operator.STARTS_WITH ->
                 comparison(
                     expression,
-                    field.expression.columnType,
+                    field.columnType,
                     "LIKE",
                     "${requiredPrimitive(condition).content}%",
                 )
@@ -458,16 +486,16 @@ public class PaginationCompiler(
             Pagination.Filter.Operator.ENDS_WITH ->
                 comparison(
                     expression,
-                    field.expression.columnType,
+                    field.columnType,
                     "LIKE",
                     "%${requiredPrimitive(condition).content}",
                 )
 
             Pagination.Filter.Operator.IN ->
-                inList(expression, field.expression.columnType, condition.value, negate = false)
+                inList(expression, field.columnType, condition.value, negate = false)
 
             Pagination.Filter.Operator.NOT_IN ->
-                inList(expression, field.expression.columnType, condition.value, negate = true)
+                inList(expression, field.columnType, condition.value, negate = true)
 
             Pagination.Filter.Operator.IS_NULL ->
                 nullComparison(expression, isNull = true)
@@ -487,7 +515,7 @@ public class PaginationCompiler(
         val value = condition.value
             ?: error("Operator ${condition.operator} requires a value")
 
-        return parseValue(field.expression.columnType, value)
+        return parseValue(field.columnType, value)
     }
 
     private fun requiredPrimitive(
@@ -598,7 +626,6 @@ public class PaginationCompiler(
     ): String {
         val values = sort.map { sortItem ->
             val field = requireField(sortItem.column)
-
             @Suppress("UNCHECKED_CAST")
             val expression = field.expression as Expression<Any?>
             row[expression]?.toString()
@@ -657,9 +684,9 @@ public class PaginationCompiler(
                     } else {
                         comparison(
                             previousField.expression,
-                            previousField.expression.columnType,
+                            previousField.columnType,
                             "=",
-                            parseCursorValue(previousField.expression.columnType, previousValue),
+                            parseCursorValue(previousField.columnType, previousValue),
                         )
                     }
                 }
@@ -680,9 +707,9 @@ public class PaginationCompiler(
 
                 val valuePredicate = comparison(
                     currentField.expression,
-                    currentField.expression.columnType,
+                    currentField.columnType,
                     operator,
-                    parseCursorValue(currentField.expression.columnType, currentValue),
+                    parseCursorValue(currentField.columnType, currentValue),
                 )
 
                 listOf(
@@ -776,144 +803,5 @@ public class PaginationCompiler(
                 "Unsupported pagination field type ${columnType.sqlType()}",
             )
         }
-    }
-}
-
-// ============================================================================
-// BASIC RUNNABLE EXAMPLE
-// ============================================================================
-
-private object DemoUsers : Table("users") {
-    val id = integer("id")
-    val name = varchar("name", 100)
-    val country = varchar("country", 100).nullable()
-    val age = integer("age")
-
-    override val primaryKey = PrimaryKey(id)
-}
-
-/**
- * Minimal R2DBC/H2 example.
- *
- * Required dependencies for this demo:
- * - exposed-core
- * - exposed-r2dbc
- * - kotlinx-coroutines
- * - kotlinx-serialization-json
- * - r2dbc-h2
- *
- * The example demonstrates:
- * - field whitelisting through PaginationDefinition;
- * - filtering;
- * - multi-column sorting;
- * - automatic unique-key tie breaking;
- * - NULLS LAST;
- * - LIMIT + 1;
- * - opaque Base64 cursor round-trip;
- * - fetching page 2 using the cursor from page 1.
- */
-public fun main(): Unit = runBlocking {
-    val database = R2dbcDatabase.connect(
-        "r2dbc:h2:mem:///pagination-demo;DB_CLOSE_DELAY=-1",
-    )
-
-    suspendTransaction(database) {
-        SchemaUtils.create(DemoUsers)
-
-        listOf(
-            1 to ("Alice" to ("Slovenia" to 31)),
-            2 to ("Bob" to ("Italy" to 28)),
-            3 to ("Carol" to (null to 22)),
-            4 to ("David" to ("Germany" to 35)),
-            5 to ("Eva" to (null to 26)),
-            6 to ("Frank" to ("Italy" to 41)),
-            7 to ("Grace" to ("Slovenia" to 29)),
-        ).forEach { (id, data) ->
-            val (name, rest) = data
-            val (country, age) = rest
-
-            DemoUsers.insert {
-                it[DemoUsers.id] = id
-                it[DemoUsers.name] = name
-                it[DemoUsers.country] = country
-                it[DemoUsers.age] = age
-            }
-        }
-
-        val definition = PaginationDefinition(
-            fields = mapOf(
-                "id" to PaginationDefinition.field(DemoUsers.id),
-                "name" to PaginationDefinition.field(DemoUsers.name),
-                "country" to PaginationDefinition.field(DemoUsers.country),
-                "age" to PaginationDefinition.field(DemoUsers.age),
-            ),
-            uniqueKey = listOf("id"),
-        )
-
-        val compiler = PaginationCompiler(
-            definition = definition,
-            maxLimit = 50,
-        )
-
-        val baseQuery = DemoUsers
-            .selectAll()
-
-        val first = compiler.apply(
-            request = Pagination(
-                limit = 3,
-                sort = listOf(
-                    Pagination.Sort("country", Pagination.Sort.Direction.ASC),
-                ),
-                filter = Pagination.Filter.Condition(
-                    column = "age",
-                    operator = Pagination.Filter.Operator.GTE,
-                    value = JsonPrimitive(20),
-                ),
-            ),
-            source = baseQuery,
-        )
-
-        println("PAGE 1")
-        first.page.data.forEach { row ->
-            println(
-                "${row[DemoUsers.id]} | " +
-                        "${row[DemoUsers.name]} | " +
-                        "${row[DemoUsers.country]} | " +
-                        "${row[DemoUsers.age]}",
-            )
-        }
-        println("nextCursor=${first.page.nextCursor}")
-        println()
-
-        val second = compiler.apply(
-            request = Pagination(
-                limit = 3,
-                sort = listOf(
-                    Pagination.Sort("country", Pagination.Sort.Direction.ASC),
-                ),
-                filter = Pagination.Filter.Condition(
-                    column = "age",
-                    operator = Pagination.Filter.Operator.GTE,
-                    value = JsonPrimitive(20),
-                ),
-                cursor = first.page.nextCursor,
-            ),
-            source = DemoUsers.selectAll(),
-        )
-
-        println("PAGE 2")
-        second.page.data.forEach { row ->
-            println(
-                "${row[DemoUsers.id]} | " +
-                        "${row[DemoUsers.name]} | " +
-                        "${row[DemoUsers.country]} | " +
-                        "${row[DemoUsers.age]}",
-            )
-        }
-        println("nextCursor=${second.page.nextCursor}")
-        println()
-
-        println("Cursor is opaque to the API client:")
-        println(first.page.nextCursor)
     }
 }
