@@ -14,6 +14,15 @@ internal object UserTable : ExpTable<User>("users") {
     val password = binary("password", 255)
     val type = enumerationByName<User.Type>("type", 255)
 
+    override val paginationDefinition = PaginationDefinition(
+        fields = mapOf(
+            "id" to PaginationDefinition.field(id),
+            "username" to PaginationDefinition.field(username),
+            "email" to PaginationDefinition.field(expression = email, paginationType = PaginationType.ENCRYPTED),
+            "type" to PaginationDefinition.field(type),
+        )
+    )
+
     override fun toDomain(row: ResultRow) = User(
         username = row[username],
         password = Hashed(row[password]),

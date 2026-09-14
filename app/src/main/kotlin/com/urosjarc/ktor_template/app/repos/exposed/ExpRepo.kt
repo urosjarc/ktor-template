@@ -17,11 +17,11 @@ import org.jetbrains.exposed.v1.r2dbc.*
 import java.time.OffsetDateTime
 
 internal abstract class ExpTable<T>(name: String) : UuidTable(name, uuidVersion = UuidVersion.V7) {
+    abstract val paginationDefinition: PaginationDefinition
     val createdAt = timestampWithTimeZone("created_at")
     val updatedAt = timestampWithTimeZone("updated_at")
     abstract fun toDomain(row: ResultRow): T
     abstract fun toRow(tx: UpdateBuilder<Int>, domain: T)
-    val paginationCompiler: PaginationCompiler get() = PaginationCompiler(this)
 }
 
 internal open class ExpRepo<T : Domain<T>>(val table: ExpTable<T>) : Repo<T> {
@@ -41,7 +41,7 @@ internal open class ExpRepo<T : Domain<T>>(val table: ExpTable<T>) : Repo<T> {
     }
 
     override suspend fun select(pagination: Pagination): Pagination.Page<T> {
-        val result = PaginationCompiler(table = table).apply(request = pagination, source = table.selectAll())
+        val result = PaginationCompiler(definition = table.paginationDefinition).apply(request = pagination, source = table.selectAll())
         return Pagination.Page(
             data = result.page.data.map(table::toDomain),
             nextCursor = result.page.nextCursor,

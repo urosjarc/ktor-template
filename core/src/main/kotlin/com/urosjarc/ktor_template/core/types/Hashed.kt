@@ -1,6 +1,5 @@
 package com.urosjarc.ktor_template.core.types
 
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder
 import kotlin.math.pow
@@ -15,7 +14,7 @@ public fun String.hashed(): Hashed {
 @JvmInline
 @Serializable
 public value class Hashed(
-	@Contextual public val value: ByteArray,
+	public val value: ByteArray,
 ) {
 	override fun toString(): String = this.value.decodeToString()
 

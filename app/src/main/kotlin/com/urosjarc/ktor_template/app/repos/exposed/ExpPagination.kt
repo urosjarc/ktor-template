@@ -2,438 +2,548 @@ package com.urosjarc.ktor_template.app.repos.exposed
 
 import com.urosjarc.ktor_template.core.types.Pagination
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
-import org.apache.logging.log4j.kotlin.logger
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.r2dbc.Query
-import java.util.*
+import org.jetbrains.exposed.v1.r2dbc.R2dbcDatabase
+import org.jetbrains.exposed.v1.r2dbc.SchemaUtils
+import org.jetbrains.exposed.v1.r2dbc.insert
+import org.jetbrains.exposed.v1.r2dbc.selectAll
+import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
+import java.math.BigDecimal
+import java.util.Base64
+import java.util.UUID
 
-private val Table.primaryKeyName: String get() {
-    return this.primaryKey!!.columns.single().name
+public enum class PaginationType {
+    STRING,
+    INTEGER,
+    DECIMAL,
+    BOOLEAN,
+    UUID,
+    DATE,
+    DATETIME,
+    ENCRYPTED,
+    HASHED,
+    BINARY;
+
+    public companion object {
+        public fun from(columnType: IColumnType<*>): PaginationType =
+            when (columnType) {
+                is ColumnType<String> -> STRING
+                is ColumnType<Int> -> INTEGER
+                is ColumnType<BigDecimal> -> DECIMAL
+                is ColumnType<Boolean> -> BOOLEAN
+                is ColumnType<UUID> -> UUID
+                is ColumnType<Date> -> DATE
+                is ColumnType<DateTime> -> DATETIME
+                else -> BINARY
+            }
+    }
 }
 
-private fun Table.column(name: String): Column<*> {
-    logger.debug("Resolving column '$name' in table '${this.tableName}'")
-    return this.columns.firstOrNull { it.name == name }
-        ?: run {
-            logger.debug("Column '$name' not found in table '${this.tableName}'")
-            error("Unknown column: $name")
+/**
+ * Describes the fields exposed to the pagination API.
+ *
+ * The expression can be:
+ * - a normal table column;
+ * - a column from a joined table;
+ * - an aliased expression;
+ * - an aggregate such as SUM(...).alias("total");
+ * - a computed expression.
+ *
+ * [filterPlacement] controls where predicates for this field are emitted and
+ * also tells cursor compilation whether the keyset predicate belongs in
+ * WHERE or HAVING.
+ *
+ * The expression must be part of the SELECT list of the source query if it is
+ * used for sorting or if a cursor has to be created from it.
+ */
+public data class PaginationField<T>(
+    public val expression: ExpressionWithColumnType<T>,
+    public val paginationType: PaginationType? = null,
+    public val filterPlacement: FilterPlacement = FilterPlacement.WHERE,
+) {
+    public val resolvedPaginationType: PaginationType
+        get() = paginationType ?: PaginationType.from(expression.columnType)
+}
+
+public enum class FilterPlacement {
+    WHERE,
+    HAVING,
+}
+
+/**
+ * Defines the API-visible pagination fields for one screen/query.
+ *
+ * [uniqueKey] must identify one logical row uniquely and should normally be
+ * non-null. All missing unique-key fields are appended to the requested sort
+ * as deterministic tie-breakers.
+ */
+public data class PaginationDefinition(
+    public val fields: Map<String, PaginationField<*>>,
+    public val uniqueKey: List<String> = listOf("id"),
+    public val defaultSort: List<Pagination.Sort> = uniqueKey.map {
+        Pagination.Sort(it, Pagination.Sort.Direction.ASC)
+    },
+) {
+    init {
+        require(fields.isNotEmpty()) { "Pagination definition must contain at least one field" }
+        require(uniqueKey.isNotEmpty()) { "Pagination definition must contain a unique key" }
+        require(uniqueKey.all(fields::containsKey)) {
+            "All unique key fields must exist in pagination fields"
         }
-}
-
-private val Table.defaultSort: List<Pagination.Sort>
-    get() {
-        return listOf(Pagination.Sort(this.primaryKeyName, Pagination.Sort.Direction.ASC))
+        require(defaultSort.isNotEmpty()) { "Default sort must contain at least one field" }
+        require(defaultSort.all { fields.containsKey(it.column) }) {
+            "All default sort fields must exist in pagination fields"
+        }
     }
 
-// ============================================================================
-// PAGINATION COMPILER
-// ============================================================================
+    public companion object {
+        /**
+         * Convenient factory for an Exposed typed expression.
+         */
+        public fun <T> field(
+            expression: ExpressionWithColumnType<T>,
+            filterPlacement: FilterPlacement = FilterPlacement.WHERE,
+            paginationType: PaginationType? = null,
+        ): PaginationField<T> = PaginationField(
+            expression = expression,
+            filterPlacement = filterPlacement,
+            paginationType = paginationType,
+        )
+    }
+}
 
-public class PaginationCompiler(private val table: Table) {
-    private val json = Json
+/**
+ * The decoded, backend-internal representation of a cursor.
+ *
+ * Values are strings because they need to survive serialization without
+ * coupling the cursor format to a particular database/JVM type hierarchy.
+ */
+public data class PaginationCursor(
+    public val sort: List<Pagination.Sort>,
+    public val values: List<String?>,
+)
+
+/**
+ * Cursor encoding is intentionally replaceable.
+ *
+ * The default implementation is plain Base64. Applications that need
+ * confidentiality or tamper protection can provide their own implementation,
+ * for example one backed by authenticated encryption or an HMAC.
+ */
+public interface CursorCodec {
+    public fun encode(cursor: PaginationCursor): String
+    public fun decode(value: String): PaginationCursor
+}
+
+/**
+ * Default cursor representation:
+ *
+ * JSON -> UTF-8 -> Base64 (without padding)
+ *
+ * Base64 is transport encoding, not encryption and not integrity protection.
+ */
+public class Base64CursorCodec(
+    private val json: Json = Json,
+) : CursorCodec {
+    @Serializable
+    private data class Payload(
+        val sort: List<Pagination.Sort>,
+        val values: List<String?>,
+    )
+
+    override fun encode(cursor: PaginationCursor): String {
+        val payload = Payload(
+            sort = cursor.sort,
+            values = cursor.values,
+        )
+
+        val encodedJson = json.encodeToString(payload)
+        return Base64.getEncoder()
+            .withoutPadding()
+            .encodeToString(encodedJson.toByteArray(Charsets.UTF_8))
+    }
+
+    override fun decode(value: String): PaginationCursor {
+        val decoded = try {
+            String(
+                Base64.getDecoder().decode(value),
+                Charsets.UTF_8,
+            )
+        } catch (cause: IllegalArgumentException) {
+            throw IllegalArgumentException("Invalid pagination cursor", cause)
+        }
+
+        val payload = try {
+            json.decodeFromString<Payload>(decoded)
+        } catch (cause: Exception) {
+            throw IllegalArgumentException("Invalid pagination cursor", cause)
+        }
+
+        return PaginationCursor(
+            sort = payload.sort,
+            values = payload.values,
+        )
+    }
+}
+
+/**
+ * Generic keyset-pagination compiler for Exposed R2DBC queries.
+ *
+ * The source query owns the dataset and may contain arbitrary joins,
+ * subqueries, GROUP BY, aggregates, and computed expressions.
+ *
+ * The compiler only adds:
+ * - client-visible filtering;
+ * - cursor predicate;
+ * - deterministic ORDER BY;
+ * - LIMIT + 1;
+ * - next-cursor creation.
+ */
+public class PaginationCompiler(
+    private val definition: PaginationDefinition,
+    private val cursorCodec: CursorCodec = Base64CursorCodec(),
+    private val maxLimit: Int = 100,
+) {
+    init {
+        require(maxLimit > 0) { "maxLimit must be greater than zero" }
+    }
 
     public data class Result(
         val query: Query,
-        val page: Pagination.Page<ResultRow>
+        val page: Pagination.Page<ResultRow>,
     )
 
-    /**
-     * Applies:
-     *
-     * - recursive filtering
-     * - cursor predicate
-     * - multi-column sorting
-     * - deterministic primary-key tie breaker
-     * - LIMIT + 1
-     * - next cursor creation
-     */
     public suspend fun apply(
         request: Pagination,
-        source: Query
+        source: Query,
     ): Result {
-        logger.debug("Applying pagination: limit=${request.limit}, sort=${request.sort}, cursor=${request.cursor}, filter=${request.filter}")
-
-        require(request.limit > 0) {
-            "limit must be greater than zero"
+        require(request.limit in 1..maxLimit) {
+            "limit must be between 1 and $maxLimit"
         }
 
         val sort = normalizeSort(request.sort)
-        logger.debug("Normalized sort order: $sort")
-
-        val cursor = request.cursor?.let(::decodeCursor)
-        logger.debug("Decoded cursor: $cursor")
+        val cursor = request.cursor?.let(cursorCodec::decode)
 
         validateCursor(sort, cursor)
-        logger.debug("Cursor validation passed")
 
-        val filterExpression =
-            request.filter?.let(::compileFilter)
-        logger.debug("Compiled filter expression: $filterExpression")
+        val filterPlan = request.filter?.let(::compileFilter)
+            ?: FilterPlan()
 
-        val cursorExpression =
-            cursor?.let {
-                compileCursor(
-                    sort = sort,
-                    cursor = it
-                )
-            }
-        logger.debug("Compiled cursor expression: $cursorExpression")
-
-        val predicates = buildList {
-            filterExpression?.let(::add)
-            cursorExpression?.let(::add)
+        val cursorPlan = cursor?.let {
+            compileCursor(
+                sort = sort,
+                cursor = it,
+            )
         }
-        logger.debug("Combined predicates count: ${predicates.size}")
 
-        logger.debug("Executing query with limit: ${request.limit + 1}")
-        val query =
-            source
-                .where {
-                    when {
-                        predicates.isEmpty() -> Op.TRUE
-                        else -> predicates.compoundAnd()
-                    }
-                }
-                .orderBy(*compileSort(sort))
-                .limit(request.limit + 1)
+        var query = source
+
+        val wherePredicates = buildList {
+            filterPlan.where?.let(::add)
+            cursorPlan?.takeIf { it.placement == FilterPlacement.WHERE }?.predicate?.let(::add)
+        }
+
+        if (wherePredicates.isNotEmpty()) {
+            query = query.where { wherePredicates.compoundAnd() }
+        }
+
+        val havingPredicates = buildList {
+            filterPlan.having?.let(::add)
+            cursorPlan?.takeIf { it.placement == FilterPlacement.HAVING }?.predicate?.let(::add)
+        }
+
+        if (havingPredicates.isNotEmpty()) {
+            query = query.having { havingPredicates.compoundAnd() }
+        }
+
+        query = query
+            .orderBy(*compileSort(sort))
+            .limit(request.limit + 1)
 
         val rows = query.toList()
         val hasNext = rows.size > request.limit
-        logger.debug("Query returned ${rows.size} rows (limit=${request.limit}, hasNext=$hasNext)")
+        val page = if (hasNext) rows.take(request.limit) else rows
 
-        val page =
-            if (hasNext) {
-                rows.take(request.limit)
-            } else {
-                rows
+        val nextCursor = if (hasNext) {
+            page.lastOrNull()?.let { row ->
+                encodeCursor(sort, row)
             }
-
-        val nextCursor =
-            if (hasNext) {
-                page.lastOrNull()?.let { row ->
-                    encodeCursor(
-                        sort = sort,
-                        row = row
-                    )
-                }
-            } else {
-                null
-            }
-
-        logger.debug("Pagination result: page size=${page.size}, nextCursor=$nextCursor")
+        } else {
+            null
+        }
 
         return Result(
             query = query,
             page = Pagination.Page(
                 data = page,
                 nextCursor = nextCursor,
-            )
+            ),
         )
     }
 
-
-    // ========================================================================
-    // SORT
-    // ========================================================================
-
     private fun normalizeSort(
-        requested: List<Pagination.Sort>
+        requested: List<Pagination.Sort>,
     ): List<Pagination.Sort> {
-        logger.debug("Normalizing sort: requested=$requested, defaultSort=${table.defaultSort}, primaryKey=${table.primaryKey}")
+        val base = if (requested.isEmpty()) definition.defaultSort else requested
 
-        val sort =
-            if (requested.isEmpty()) {
-                table.defaultSort
-            } else {
-                requested
+        base.forEach { sort ->
+            require(definition.fields.containsKey(sort.column)) {
+                "Unknown pagination field: ${sort.column}"
             }
-
-        val result = if (sort.any { it.column == table.primaryKeyName }) {
-            sort
-        } else {
-            sort + Pagination.Sort(
-                column = table.primaryKeyName,
-                direction = Pagination.Sort.Direction.ASC
-            )
         }
-        logger.debug("Sort normalization resolved to: $result")
+
+        val result = base.toMutableList()
+
+        for (uniqueKeyField in definition.uniqueKey) {
+            if (result.none { it.column == uniqueKeyField }) {
+                result += Pagination.Sort(
+                    column = uniqueKeyField,
+                    direction = Pagination.Sort.Direction.ASC,
+                )
+            }
+        }
+
         return result
     }
 
-
+    /**
+     * NULLS LAST is a hard pagination invariant.
+     *
+     * Each sort expression becomes:
+     *
+     *     CASE WHEN expr IS NULL THEN 1 ELSE 0 END ASC,
+     *     expr ASC|DESC
+     *
+     * The CASE term makes null placement independent of the database's
+     * default NULL ordering.
+     */
     private fun compileSort(
-        sort: List<Pagination.Sort>
-    ): Array<Pair<Column<*>, SortOrder>> {
-        logger.debug("Compiling sort clauses: $sort")
-        val compiled = sort.map { item ->
-            val col = table.column(item.column)
+        sort: List<Pagination.Sort>,
+    ): Array<Pair<Expression<*>, SortOrder>> {
+        return sort.flatMap { item ->
+            val field = definition.fields[item.column]
+                ?: error("Unknown pagination field: ${item.column}")
+
             val order = when (item.direction) {
                 Pagination.Sort.Direction.ASC -> SortOrder.ASC
                 Pagination.Sort.Direction.DESC -> SortOrder.DESC
             }
-            logger.debug("Sort clause: column=${col.name}, order=$order")
-            col to order
+
+            listOf(
+                nullRank(field.expression) to SortOrder.ASC,
+                field.expression to order,
+            )
         }.toTypedArray()
-        return compiled
     }
 
+    private fun nullRank(
+        expression: Expression<*>,
+    ): Expression<Int> = object : Expression<Int>() {
+        override fun toQueryBuilder(queryBuilder: QueryBuilder) {
+            queryBuilder.append("CASE WHEN ")
+            queryBuilder.append(expression)
+            queryBuilder.append(" IS NULL THEN 1 ELSE 0 END")
+        }
+    }
 
     // ========================================================================
     // FILTER
     // ========================================================================
 
+    private data class FilterPlan(
+        val where: Op<Boolean>? = null,
+        val having: Op<Boolean>? = null,
+    )
+
     private fun compileFilter(
-        filter: Pagination.Filter
-    ): Op<Boolean> {
-        logger.debug("Compiling filter: $filter")
-        return when (filter) {
-            is Pagination.Filter.Condition -> {
-                logger.debug("Compiling filter condition: column=${filter.column}, operator=${filter.operator}, value=${filter.value}")
-                compileCondition(filter)
+        filter: Pagination.Filter,
+    ): FilterPlan = when (filter) {
+        is Pagination.Filter.Condition -> {
+            val field = requireField(filter.column)
+            val predicate = compileCondition(field, filter)
+
+            when (field.filterPlacement) {
+                FilterPlacement.WHERE -> FilterPlan(where = predicate)
+                FilterPlacement.HAVING -> FilterPlan(having = predicate)
+            }
+        }
+
+        is Pagination.Filter.And -> {
+            require(filter.filters.isNotEmpty()) { "AND requires at least one filter" }
+            val plans = filter.filters.map(::compileFilter)
+
+            FilterPlan(
+                where = plans.mapNotNull { it.where }.takeIf(List<*>::isNotEmpty)?.compoundAnd(),
+                having = plans.mapNotNull { it.having }.takeIf(List<*>::isNotEmpty)?.compoundAnd(),
+            )
+        }
+
+        is Pagination.Filter.Or -> {
+            require(filter.filters.isNotEmpty()) { "OR requires at least one filter" }
+            val plans = filter.filters.map(::compileFilter)
+
+            val hasWhere = plans.any { it.where != null }
+            val hasHaving = plans.any { it.having != null }
+
+            require(!(hasWhere && hasHaving)) {
+                "OR cannot mix WHERE and HAVING filters"
             }
 
-            is Pagination.Filter.And -> {
-                logger.debug("Compiling AND filter with ${filter.filters.size} sub-filters")
-                require(filter.filters.isNotEmpty()) {
-                    "AND requires at least one filter"
-                }
+            when {
+                hasWhere -> FilterPlan(
+                    where = plans.mapNotNull { it.where }.compoundOr(),
+                )
 
-                filter.filters
-                    .map(::compileFilter)
-                    .compoundAnd()
-            }
+                hasHaving -> FilterPlan(
+                    having = plans.mapNotNull { it.having }.compoundOr(),
+                )
 
-            is Pagination.Filter.Or -> {
-                logger.debug("Compiling OR filter with ${filter.filters.size} sub-filters")
-                require(filter.filters.isNotEmpty()) {
-                    "OR requires at least one filter"
-                }
-
-                filter.filters
-                    .map(::compileFilter)
-                    .compoundOr()
+                else -> error("OR contains no predicates")
             }
         }
     }
 
-
     private fun compileCondition(
-        condition: Pagination.Filter.Condition
+        field: PaginationField<*>,
+        condition: Pagination.Filter.Condition,
     ): Op<Boolean> {
-        val column = table.column(condition.column)
-        logger.debug("Compiling condition on column '${column.name}' with operator '${condition.operator}' and value '${condition.value}'")
+        val expression = field.expression
 
         return when (condition.operator) {
             Pagination.Filter.Operator.EQ ->
-                comparison(
-                    column = column,
-                    operator = "=",
-                    value = requiredValue(column, condition)
-                )
+                comparison(expression, field.expression.columnType, "=", requiredValue(field, condition))
 
             Pagination.Filter.Operator.NE ->
-                comparison(
-                    column = column,
-                    operator = "<>",
-                    value = requiredValue(column, condition)
-                )
+                comparison(expression, field.expression.columnType, "<>", requiredValue(field, condition))
 
             Pagination.Filter.Operator.GT ->
-                comparison(
-                    column = column,
-                    operator = ">",
-                    value = requiredValue(column, condition)
-                )
+                comparison(expression, field.expression.columnType, ">", requiredValue(field, condition))
 
             Pagination.Filter.Operator.GTE ->
-                comparison(
-                    column = column,
-                    operator = ">=",
-                    value = requiredValue(column, condition)
-                )
+                comparison(expression, field.expression.columnType, ">=", requiredValue(field, condition))
 
             Pagination.Filter.Operator.LT ->
-                comparison(
-                    column = column,
-                    operator = "<",
-                    value = requiredValue(column, condition)
-                )
+                comparison(expression, field.expression.columnType, "<", requiredValue(field, condition))
 
             Pagination.Filter.Operator.LTE ->
-                comparison(
-                    column = column,
-                    operator = "<=",
-                    value = requiredValue(column, condition)
-                )
+                comparison(expression, field.expression.columnType, "<=", requiredValue(field, condition))
 
             Pagination.Filter.Operator.BETWEEN ->
-                between(
-                    column = column,
-                    value = condition.value
-                )
+                between(expression, field.expression.columnType, condition.value)
 
             Pagination.Filter.Operator.CONTAINS ->
-                like(
-                    column = column,
-                    value = "%${requiredPrimitive(condition).content}%"
+                comparison(
+                    expression,
+                    field.expression.columnType,
+                    "LIKE",
+                    "%${requiredPrimitive(condition).content}%",
                 )
 
             Pagination.Filter.Operator.STARTS_WITH ->
-                like(
-                    column = column,
-                    value = "${requiredPrimitive(condition).content}%"
+                comparison(
+                    expression,
+                    field.expression.columnType,
+                    "LIKE",
+                    "${requiredPrimitive(condition).content}%",
                 )
 
             Pagination.Filter.Operator.ENDS_WITH ->
-                like(
-                    column = column,
-                    value = "%${requiredPrimitive(condition).content}"
+                comparison(
+                    expression,
+                    field.expression.columnType,
+                    "LIKE",
+                    "%${requiredPrimitive(condition).content}",
                 )
 
             Pagination.Filter.Operator.IN ->
-                inList(
-                    column = column,
-                    value = condition.value,
-                    negate = false
-                )
+                inList(expression, field.expression.columnType, condition.value, negate = false)
 
             Pagination.Filter.Operator.NOT_IN ->
-                inList(
-                    column = column,
-                    value = condition.value,
-                    negate = true
-                )
+                inList(expression, field.expression.columnType, condition.value, negate = true)
 
             Pagination.Filter.Operator.IS_NULL ->
-                nullComparison(
-                    column = column,
-                    isNull = true
-                )
+                nullComparison(expression, isNull = true)
 
             Pagination.Filter.Operator.IS_NOT_NULL ->
-                nullComparison(
-                    column = column,
-                    isNull = false
-                )
+                nullComparison(expression, isNull = false)
         }
     }
 
+    private fun requireField(name: String): PaginationField<*> =
+        definition.fields[name] ?: error("Unknown pagination field: $name")
 
     private fun requiredValue(
-        column: Column<*>,
-        condition: Pagination.Filter.Condition
+        field: PaginationField<*>,
+        condition: Pagination.Filter.Condition,
     ): Any {
-        logger.debug("Extracting required value for condition '${condition.operator}' on column '${column.name}' from '${condition.value}'")
-        return condition.value?.let {
-            parseValue(column, it)
-        } ?: error(
-            "Operator ${condition.operator} requires a value"
-        )
-    }
+        val value = condition.value
+            ?: error("Operator ${condition.operator} requires a value")
 
+        return parseValue(field.expression.columnType, value)
+    }
 
     private fun requiredPrimitive(
-        condition: Pagination.Filter.Condition
-    ): JsonPrimitive {
-        logger.debug("Extracting required primitive for condition '${condition.operator}' on column '${condition.column}' from '${condition.value}'")
-        return condition.value?.jsonPrimitive ?: error(
-            "Operator ${condition.operator} requires a value"
-        )
-    }
-
+        condition: Pagination.Filter.Condition,
+    ) = condition.value?.jsonPrimitive
+        ?: error("Operator ${condition.operator} requires a value")
 
     private fun between(
-        column: Column<*>,
-        value: JsonElement?
+        expression: Expression<*>,
+        columnType: IColumnType<*>,
+        value: JsonElement?,
     ): Op<Boolean> {
-        logger.debug("Building BETWEEN predicate for column '${column.name}' with value: $value")
-        val array =
-            value as? JsonArray ?: error(
-                "BETWEEN requires [from, to]"
-            )
+        val array = value as? JsonArray
+            ?: error("BETWEEN requires [from, to]")
 
         require(array.size == 2) {
             "BETWEEN requires exactly two values"
         }
 
-        val from = parseValue(column, array[0])
-        val to = parseValue(column, array[1])
-        logger.debug("Parsed BETWEEN range for column '${column.name}': from=$from, to=$to")
+        val from = parseValue(columnType, array[0])
+        val to = parseValue(columnType, array[1])
 
         return object : Op<Boolean>() {
-
-            override fun toQueryBuilder(
-                queryBuilder: QueryBuilder
-            ) {
-                queryBuilder.append(column)
+            override fun toQueryBuilder(queryBuilder: QueryBuilder) {
+                queryBuilder.append(expression)
                 queryBuilder.append(" BETWEEN ")
-
-                registerArgument(
-                    queryBuilder = queryBuilder,
-                    column = column,
-                    value = from
-                )
-
+                registerArgument(queryBuilder, columnType, from)
                 queryBuilder.append(" AND ")
-
-                registerArgument(
-                    queryBuilder = queryBuilder,
-                    column = column,
-                    value = to
-                )
+                registerArgument(queryBuilder, columnType, to)
             }
         }
     }
 
-
     private fun inList(
-        column: Column<*>,
+        expression: Expression<*>,
+        columnType: IColumnType<*>,
         value: JsonElement?,
-        negate: Boolean
+        negate: Boolean,
     ): Op<Boolean> {
-        val opName = if (negate) Pagination.Filter.Operator.NOT_IN else Pagination.Filter.Operator.IN
-        logger.debug("Building $opName predicate for column '${column.name}' with value: $value")
-        val array =
-            value as? JsonArray ?: error(
-                "$opName requires an array"
-            )
+        val array = value as? JsonArray
+            ?: error("IN / NOT_IN requires an array")
 
         require(array.isNotEmpty()) {
             "IN / NOT_IN requires at least one value"
         }
 
-        val values = array.map {
-            parseValue(column, it)
-        }
-        logger.debug("Parsed $opName values for column '${column.name}': $values")
+        val values = array.map { parseValue(columnType, it) }
 
         return object : Op<Boolean>() {
-
-            override fun toQueryBuilder(
-                queryBuilder: QueryBuilder
-            ) {
-
-                queryBuilder.append(column)
-                queryBuilder.append(
-                    if (negate) {
-                        " NOT IN ("
-                    } else {
-                        " IN ("
-                    }
-                )
+            override fun toQueryBuilder(queryBuilder: QueryBuilder) {
+                queryBuilder.append(expression)
+                queryBuilder.append(if (negate) " NOT IN (" else " IN (")
 
                 values.forEachIndexed { index, item ->
-                    if (index > 0) {
-                        queryBuilder.append(", ")
-                    }
-
-                    registerArgument(
-                        queryBuilder = queryBuilder,
-                        column = column,
-                        value = item
-                    )
+                    if (index > 0) queryBuilder.append(", ")
+                    registerArgument(queryBuilder, columnType, item)
                 }
 
                 queryBuilder.append(")")
@@ -441,357 +551,191 @@ public class PaginationCompiler(private val table: Table) {
         }
     }
 
-
     private fun nullComparison(
-        column: Column<*>,
-        isNull: Boolean
-    ): Op<Boolean> {
-        logger.debug("Building null comparison for column '${column.name}': isNull=$isNull")
-        return object : Op<Boolean>() {
-
-            override fun toQueryBuilder(
-                queryBuilder: QueryBuilder
-            ) {
-                queryBuilder.append(column)
-                queryBuilder.append(
-                    if (isNull) {
-                        " IS NULL"
-                    } else {
-                        " IS NOT NULL"
-                    }
-                )
-            }
+        expression: Expression<*>,
+        isNull: Boolean,
+    ): Op<Boolean> = object : Op<Boolean>() {
+        override fun toQueryBuilder(queryBuilder: QueryBuilder) {
+            queryBuilder.append(expression)
+            queryBuilder.append(if (isNull) " IS NULL" else " IS NOT NULL")
         }
     }
 
-
-    @Suppress("UNCHECKED_CAST")
     private fun comparison(
-        column: Column<*>,
+        expression: Expression<*>,
+        columnType: IColumnType<*>,
         operator: String,
-        value: Any
-    ): Op<Boolean> {
-        logger.debug("Building comparison predicate: ${column.name} $operator $value")
-        return object : Op<Boolean>() {
-
-            override fun toQueryBuilder(
-                queryBuilder: QueryBuilder
-            ) {
-                queryBuilder.append(column)
-                queryBuilder.append(" $operator ")
-
-                registerArgument(
-                    queryBuilder = queryBuilder,
-                    column = column,
-                    value = value
-                )
-            }
+        value: Any,
+    ): Op<Boolean> = object : Op<Boolean>() {
+        override fun toQueryBuilder(queryBuilder: QueryBuilder) {
+            queryBuilder.append(expression)
+            queryBuilder.append(" ")
+            queryBuilder.append(operator)
+            queryBuilder.append(" ")
+            registerArgument(queryBuilder, columnType, value)
         }
     }
 
-
-    private fun like(
-        column: Column<*>,
-        value: String
-    ): Op<Boolean> {
-        logger.debug("Building LIKE predicate for column '${column.name}' with pattern '$value'")
-        return comparison(
-            column = column,
-            operator = "LIKE",
-            value = value
-        )
-    }
-
-
-    @Suppress("UNCHECKED_CAST")
     private fun registerArgument(
         queryBuilder: QueryBuilder,
-        column: Column<*>,
-        value: Any?
+        columnType: IColumnType<*>,
+        value: Any?,
     ) {
-        logger.debug("Registering SQL argument for column '${column.name}' (${column.columnType.sqlType()}): $value")
+        @Suppress("UNCHECKED_CAST")
         queryBuilder.registerArgument(
-            column.columnType as IColumnType<Any>,
-            value
+            columnType as IColumnType<Any>,
+            value,
         )
     }
-
 
     // ========================================================================
     // CURSOR
     // ========================================================================
 
-    private data class Cursor(
-        val sort: List<Pagination.Sort>,
-        val values: List<String?>
-    )
-
-
-    @Serializable
-    private data class CursorPayload(
-        val sort: List<Pagination.Sort>,
-        val values: List<String?>
-    )
-
-
     private fun encodeCursor(
         sort: List<Pagination.Sort>,
-        row: ResultRow
+        row: ResultRow,
     ): String {
-        logger.debug("Encoding cursor for sort: $sort")
+        val values = sort.map { sortItem ->
+            val field = requireField(sortItem.column)
 
-        val values = sort.map { item ->
-            val col = table.column(item.column)
-            val value = row[col]
-
-            require(value != null) {
-                "Cannot create a cursor from a NULL sort value " +
-                        "for column ${item.column}"
-            }
-
-            logger.debug("Extracted sort value for column '${item.column}': $value")
-            value.toString()
+            @Suppress("UNCHECKED_CAST")
+            val expression = field.expression as Expression<Any?>
+            row[expression]?.toString()
         }
 
-        val payload =
-            CursorPayload(
+        return cursorCodec.encode(
+            PaginationCursor(
                 sort = sort,
-                values = values
+                values = values,
             )
-
-        val jsonValue =
-            json.encodeToString(payload)
-        logger.debug("Cursor payload JSON: $jsonValue")
-
-        val encoded = Base64
-            .getUrlEncoder()
-            .withoutPadding()
-            .encodeToString(
-                jsonValue.toByteArray(Charsets.UTF_8)
-            )
-        logger.debug("Encoded cursor string: $encoded")
-        return encoded
-    }
-
-
-    private fun decodeCursor(
-        value: String
-    ): Cursor {
-        logger.debug("Decoding cursor string: $value")
-
-        val decoded = try {
-            val s = String(
-                Base64
-                    .getUrlDecoder()
-                    .decode(value),
-                Charsets.UTF_8
-            )
-            logger.debug("Decoded Base64 cursor to JSON: $s")
-            s
-        } catch (cause: IllegalArgumentException) {
-            logger.debug("Failed to decode Base64 cursor: $value", cause)
-            throw IllegalArgumentException(
-                "Invalid pagination cursor",
-                cause
-            )
-        }
-
-        val payload = try {
-            json.decodeFromString<CursorPayload>(decoded)
-        } catch (cause: Exception) {
-            logger.debug("Failed to deserialize cursor payload JSON: $decoded", cause)
-            throw IllegalArgumentException(
-                "Invalid pagination cursor",
-                cause
-            )
-        }
-
-        val cursor = Cursor(
-            sort = payload.sort,
-            values = payload.values
         )
-        logger.debug("Successfully decoded cursor: $cursor")
-        return cursor
     }
-
 
     private fun validateCursor(
         sort: List<Pagination.Sort>,
-        cursor: Cursor?
+        cursor: PaginationCursor?,
     ) {
-        logger.debug("Validating cursor: $cursor against sort: $sort")
-
-        if (cursor == null) {
-            logger.debug("Cursor is null, validation skipped")
-            return
-        }
+        if (cursor == null) return
 
         require(cursor.sort == sort) {
             "Cursor was created for a different sort order"
         }
 
         require(cursor.values.size == sort.size) {
-            "Cursor contains ${cursor.values.size} values " +
-                    "but sort contains ${sort.size} columns"
+            "Cursor contains ${cursor.values.size} values but sort contains ${sort.size} columns"
         }
-        logger.debug("Cursor validation successful")
     }
 
-
     /**
-     * Generates the lexicographic keyset predicate.
+     * Builds a lexicographic keyset predicate for the effective ORDER BY.
      *
-     * Example:
-     *
-     *     ORDER BY age ASC, name DESC, id ASC
-     *
-     * becomes:
-     *
-     *     age > :age
-     *     OR (
-     *         age = :age
-     *         AND name < :name
-     *     )
-     *     OR (
-     *         age = :age
-     *         AND name = :name
-     *         AND id > :id
-     *     )
+     * NULLS LAST rules:
+     * - a non-null cursor value may advance to a larger/smaller value OR to NULL;
+     * - a NULL cursor value cannot advance using that field itself;
+     * - later unique-key fields still advance rows within the NULL group.
      */
+    private data class CursorPlan(
+        val predicate: Op<Boolean>,
+        val placement: FilterPlacement,
+    )
+
     private fun compileCursor(
         sort: List<Pagination.Sort>,
-        cursor: Cursor
-    ): Op<Boolean> {
-        logger.debug("Compiling keyset cursor predicate for sort: $sort, cursor: $cursor")
+        cursor: PaginationCursor,
+    ): CursorPlan {
+        val branches = sort.indices.mapNotNull { index ->
+            val equalities = sort.indices
+                .take(index)
+                .map { previousIndex ->
+                    val previousItem = sort[previousIndex]
+                    val previousField = requireField(previousItem.column)
+                    val previousValue = cursor.values[previousIndex]
 
-        val branches = sort.indices.map { index ->
-
-            val equalities =
-                sort.indices
-                    .take(index)
-                    .map { previousIndex ->
-
-                        val previousSort =
-                            sort[previousIndex]
-
-                        val previousValue =
-                            cursor.values[previousIndex]
-                                ?: error(
-                                    "NULL cursor values are not " +
-                                            "supported for sorting"
-                                )
-
-                        val previousColumn =
-                            table.column(previousSort.column)
-
-                        val parsedPrevValue = parseCursorValue(
-                            previousColumn,
-                            previousValue
-                        )
-                        logger.debug("Cursor branch $index: equality on column '${previousColumn.name}' = $parsedPrevValue")
-
+                    if (previousValue == null) {
+                        nullComparison(previousField.expression, isNull = true)
+                    } else {
                         comparison(
-                            column = previousColumn,
-                            operator = "=",
-                            value = parsedPrevValue
+                            previousField.expression,
+                            previousField.expression.columnType,
+                            "=",
+                            parseCursorValue(previousField.expression.columnType, previousValue),
                         )
                     }
+                }
 
-            val currentSort =
-                sort[index]
+            val currentItem = sort[index]
+            val currentField = requireField(currentItem.column)
+            val currentValue = cursor.values[index]
 
-            val currentColumn =
-                table.column(currentSort.column)
-
-            val currentValue =
-                cursor.values[index]
-                    ?: error(
-                        "NULL cursor values are not " +
-                                "supported for sorting"
-                    )
-
-            val operator =
-                when (currentSort.direction) {
+            val currentAfter = if (currentValue == null) {
+                // NULL is already the last value for this sort position.
+                // There is no row strictly after it based on this field.
+                null
+            } else {
+                val operator = when (currentItem.direction) {
                     Pagination.Sort.Direction.ASC -> ">"
                     Pagination.Sort.Direction.DESC -> "<"
                 }
 
-            val parsedCurrValue = parseCursorValue(
-                currentColumn,
-                currentValue
-            )
-            logger.debug("Cursor branch $index: comparison on column '${currentColumn.name}' $operator $parsedCurrValue")
-
-            val currentComparison =
-                comparison(
-                    column = currentColumn,
-                    operator = operator,
-                    value = parsedCurrValue
+                val valuePredicate = comparison(
+                    currentField.expression,
+                    currentField.expression.columnType,
+                    operator,
+                    parseCursorValue(currentField.expression.columnType, currentValue),
                 )
 
-            (equalities + currentComparison)
-                .compoundAnd()
+                listOf(
+                    valuePredicate,
+                    nullComparison(
+                        currentField.expression,
+                        isNull = true,
+                    ),
+                ).compoundOr()
+            }
+
+            currentAfter?.let { (equalities + it).compoundAnd() }
         }
 
-        logger.debug("Compiled ${branches.size} cursor branches into compound OR")
-        return branches.compoundOr()
-    }
+        require(branches.isNotEmpty()) {
+            "Cursor does not define a position after which rows can be fetched"
+        }
 
+        return CursorPlan(
+            predicate = branches.compoundOr(),
+            placement = if (sort.any { requireField(it.column).filterPlacement == FilterPlacement.HAVING }) {
+                FilterPlacement.HAVING
+            } else {
+                FilterPlacement.WHERE
+            },
+        )
+    }
 
     // ========================================================================
     // VALUE PARSING
     // ========================================================================
 
-    /**
-     * Convert the JSON value to the Kotlin value expected by the Exposed
-     * column type.
-     *
-     * Supported generic query types:
-     * - String
-     * - numeric types
-     * - UUID (useful for UUIDv7 primary keys)
-     *
-     * Other column types are deliberately rejected because this query system
-     * is intentionally limited to strings and numbers.
-     */
     private fun parseValue(
-        column: Column<*>,
-        value: JsonElement
-    ): Any {
-        logger.debug("Parsing JSON element value for column '${column.name}': $value")
-        return parseStringValue(
-            column = column,
-            value = value.jsonPrimitive.content
-        )
-    }
-
+        columnType: IColumnType<*>,
+        value: JsonElement,
+    ): Any = parseStringValue(columnType, value.jsonPrimitive.content)
 
     private fun parseCursorValue(
-        column: Column<*>,
-        value: String
-    ): Any {
-        logger.debug("Parsing cursor string value for column '${column.name}': $value")
-        return parseStringValue(
-            column = column,
-            value = value
-        )
-    }
-
+        columnType: IColumnType<*>,
+        value: String,
+    ): Any = parseStringValue(columnType, value)
 
     private fun parseStringValue(
-        column: Column<*>,
-        value: String
+        columnType: IColumnType<*>,
+        value: String,
     ): Any {
-        val columnType = column.columnType
-
         if (columnType is EnumerationNameColumnType<*>) {
             val enumClass = columnType.klass.java
-
             return enumClass.enumConstants
                 ?.firstOrNull { it.name == value }
                 ?: error(
-                    "Invalid value '$value' for enum column '${column.name}'. " +
-                            "Expected one of: ${enumClass.enumConstants?.joinToString()}"
+                    "Invalid enum value '$value'. Expected one of: " +
+                            enumClass.enumConstants?.joinToString(),
                 )
         }
 
@@ -804,42 +748,172 @@ public class PaginationCompiler(private val table: Table) {
             sqlType.startsWith("VARCHAR") ||
                     sqlType.startsWith("CHAR") ||
                     sqlType.startsWith("TEXT") ||
-                    sqlType.startsWith("CLOB") ->
-                value
+                    sqlType.startsWith("CLOB") -> value
 
             sqlType.startsWith("TINYINT") ||
-                    sqlType.startsWith("BYTEINT") ->
-                value.toByte()
+                    sqlType.startsWith("BYTEINT") -> value.toByte()
 
-            sqlType.startsWith("SMALLINT") ->
-                value.toShort()
+            sqlType.startsWith("SMALLINT") -> value.toShort()
 
             sqlType.startsWith("INTEGER") ||
-                    sqlType.startsWith("INT") ->
-                value.toInt()
+                    sqlType.startsWith("INT") -> value.toInt()
 
-            sqlType.startsWith("BIGINT") ->
-                value.toLong()
+            sqlType.startsWith("BIGINT") -> value.toLong()
 
-            sqlType.startsWith("REAL") ->
-                value.toFloat()
+            sqlType.startsWith("REAL") -> value.toFloat()
 
             sqlType.startsWith("DOUBLE") ||
-                    sqlType.startsWith("FLOAT") ->
-                value.toDouble()
+                    sqlType.startsWith("FLOAT") -> value.toDouble()
 
             sqlType.startsWith("DECIMAL") ||
-                    sqlType.startsWith("NUMERIC") ->
-                value.toBigDecimal()
+                    sqlType.startsWith("NUMERIC") -> value.toBigDecimal()
 
-            sqlType.startsWith("UUID") ->
-                UUID.fromString(value)
+            sqlType.startsWith("BOOLEAN") -> value.toBooleanStrict()
+
+            sqlType.startsWith("UUID") -> UUID.fromString(value)
 
             else -> error(
-                "Unsupported query column type " +
-                        "${column.columnType.sqlType()} " +
-                        "for column ${column.name}"
+                "Unsupported pagination field type ${columnType.sqlType()}",
             )
         }
+    }
+}
+
+// ============================================================================
+// BASIC RUNNABLE EXAMPLE
+// ============================================================================
+
+private object DemoUsers : Table("users") {
+    val id = integer("id")
+    val name = varchar("name", 100)
+    val country = varchar("country", 100).nullable()
+    val age = integer("age")
+
+    override val primaryKey = PrimaryKey(id)
+}
+
+/**
+ * Minimal R2DBC/H2 example.
+ *
+ * Required dependencies for this demo:
+ * - exposed-core
+ * - exposed-r2dbc
+ * - kotlinx-coroutines
+ * - kotlinx-serialization-json
+ * - r2dbc-h2
+ *
+ * The example demonstrates:
+ * - field whitelisting through PaginationDefinition;
+ * - filtering;
+ * - multi-column sorting;
+ * - automatic unique-key tie breaking;
+ * - NULLS LAST;
+ * - LIMIT + 1;
+ * - opaque Base64 cursor round-trip;
+ * - fetching page 2 using the cursor from page 1.
+ */
+public fun main(): Unit = runBlocking {
+    val database = R2dbcDatabase.connect(
+        "r2dbc:h2:mem:///pagination-demo;DB_CLOSE_DELAY=-1",
+    )
+
+    suspendTransaction(database) {
+        SchemaUtils.create(DemoUsers)
+
+        listOf(
+            1 to ("Alice" to ("Slovenia" to 31)),
+            2 to ("Bob" to ("Italy" to 28)),
+            3 to ("Carol" to (null to 22)),
+            4 to ("David" to ("Germany" to 35)),
+            5 to ("Eva" to (null to 26)),
+            6 to ("Frank" to ("Italy" to 41)),
+            7 to ("Grace" to ("Slovenia" to 29)),
+        ).forEach { (id, data) ->
+            val (name, rest) = data
+            val (country, age) = rest
+
+            DemoUsers.insert {
+                it[DemoUsers.id] = id
+                it[DemoUsers.name] = name
+                it[DemoUsers.country] = country
+                it[DemoUsers.age] = age
+            }
+        }
+
+        val definition = PaginationDefinition(
+            fields = mapOf(
+                "id" to PaginationDefinition.field(DemoUsers.id),
+                "name" to PaginationDefinition.field(DemoUsers.name),
+                "country" to PaginationDefinition.field(DemoUsers.country),
+                "age" to PaginationDefinition.field(DemoUsers.age),
+            ),
+            uniqueKey = listOf("id"),
+        )
+
+        val compiler = PaginationCompiler(
+            definition = definition,
+            maxLimit = 50,
+        )
+
+        val baseQuery = DemoUsers
+            .selectAll()
+
+        val first = compiler.apply(
+            request = Pagination(
+                limit = 3,
+                sort = listOf(
+                    Pagination.Sort("country", Pagination.Sort.Direction.ASC),
+                ),
+                filter = Pagination.Filter.Condition(
+                    column = "age",
+                    operator = Pagination.Filter.Operator.GTE,
+                    value = JsonPrimitive(20),
+                ),
+            ),
+            source = baseQuery,
+        )
+
+        println("PAGE 1")
+        first.page.data.forEach { row ->
+            println(
+                "${row[DemoUsers.id]} | " +
+                        "${row[DemoUsers.name]} | " +
+                        "${row[DemoUsers.country]} | " +
+                        "${row[DemoUsers.age]}",
+            )
+        }
+        println("nextCursor=${first.page.nextCursor}")
+        println()
+
+        val second = compiler.apply(
+            request = Pagination(
+                limit = 3,
+                sort = listOf(
+                    Pagination.Sort("country", Pagination.Sort.Direction.ASC),
+                ),
+                filter = Pagination.Filter.Condition(
+                    column = "age",
+                    operator = Pagination.Filter.Operator.GTE,
+                    value = JsonPrimitive(20),
+                ),
+                cursor = first.page.nextCursor,
+            ),
+            source = DemoUsers.selectAll(),
+        )
+
+        println("PAGE 2")
+        second.page.data.forEach { row ->
+            println(
+                "${row[DemoUsers.id]} | " +
+                        "${row[DemoUsers.name]} | " +
+                        "${row[DemoUsers.country]} | " +
+                        "${row[DemoUsers.age]}",
+            )
+        }
+        println("nextCursor=${second.page.nextCursor}")
+        println()
+
+        println("Cursor is opaque to the API client:")
+        println(first.page.nextCursor)
     }
 }

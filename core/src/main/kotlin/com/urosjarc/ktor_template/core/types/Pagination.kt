@@ -1,57 +1,63 @@
 package com.urosjarc.ktor_template.core.types
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
+/**
+ * Request sent by the client.
+ *
+ * The frontend may keep filter/sort state in the URL, while [cursor] remains
+ * transient API state in the POST body.
+ */
 @Serializable
 public data class Pagination(
-    val filter: Filter? = null,
+    val limit: Int = 20,
     val sort: List<Sort> = emptyList(),
+    val filter: Filter? = null,
     val cursor: String? = null,
-    val limit: Int = 50
 ) {
-    public data class Page<T>(
-        val data: List<T>,
-        val nextCursor: String?,
-    )
-
     @Serializable
     public data class Sort(
         val column: String,
-        val direction: Direction
+        val direction: Direction = Direction.ASC,
     ) {
         @Serializable
-        public enum class Direction { ASC, DESC }
+        public enum class Direction {
+            ASC,
+            DESC,
+        }
     }
 
     @Serializable
     public sealed interface Filter {
-
         @Serializable
-        @SerialName("condition")
         public data class Condition(
             val column: String,
             val operator: Operator,
-            val value: JsonElement? = null
+            val value: JsonElement? = null,
+        ) : Filter
+
+        @Serializable
+        public data class And(
+            val filters: List<Filter>,
+        ) : Filter
+
+        @Serializable
+        public data class Or(
+            val filters: List<Filter>,
         ) : Filter
 
         @Serializable
         public enum class Operator {
-            EQ, NE,
-            GT, GTE,
-            LT, LTE,
+            EQ, NE, GT, GTE, LT, LTE,
             BETWEEN, CONTAINS, STARTS_WITH, ENDS_WITH,
             IN, NOT_IN,
-            IS_NULL, IS_NOT_NULL
+            IS_NULL, IS_NOT_NULL,
         }
-
-        @Serializable
-        @SerialName("and")
-        public data class And(val filters: List<Filter>) : Filter
-
-        @Serializable
-        @SerialName("or")
-        public data class Or(val filters: List<Filter>) : Filter
     }
+
+    public data class Page<T>(
+        val data: List<T>,
+        val nextCursor: String?,
+    )
 }

@@ -25,7 +25,7 @@ public fun String.encrypted(): Encrypted {
 @JvmInline
 @Serializable
 public value class Encrypted(
-    @Contextual public val value: ByteArray,
+    public val value: ByteArray,
 ) {
     override fun toString(): String = this.value.decodeToString()
 

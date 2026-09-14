@@ -2,6 +2,7 @@ package com.urosjarc.ktor_template.app.repos
 
 import com.urosjarc.ktor_template.app.App
 import com.urosjarc.ktor_template.app.repos.exposed.PaginationCompiler
+import com.urosjarc.ktor_template.app.repos.exposed.PaginationDefinition
 import com.urosjarc.ktor_template.app.repos.exposed.UserTable
 import com.urosjarc.ktor_template.core.domain.User
 import com.urosjarc.ktor_template.core.extend.random
@@ -220,7 +221,11 @@ class UserRepoTest {
         runBlocking {
             App.services.db.transaction("USER REPO SELECT BY PAGINATION") { tx ->
 
-                val compiler = PaginationCompiler(table = UserTable)
+                val compiler = PaginationCompiler(
+                    definition = PaginationDefinition(
+                        fields = UserTable.paginationDefinition.fields
+                    )
+                )
                 val pagination = Pagination(
                     filter = Pagination.Filter.Condition(
                         column = "type",

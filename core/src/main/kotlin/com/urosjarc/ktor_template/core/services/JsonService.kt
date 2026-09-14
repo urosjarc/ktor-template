@@ -1,7 +1,11 @@
 package com.urosjarc.ktor_template.core.services
 
 import com.urosjarc.ktor_template.core.serializers.BytesSerializer
+import com.urosjarc.ktor_template.core.serializers.EncryptedSerializer
+import com.urosjarc.ktor_template.core.serializers.HashedSerializer
 import com.urosjarc.ktor_template.core.serializers.TimeZonedSerializer
+import com.urosjarc.ktor_template.core.types.Encrypted
+import com.urosjarc.ktor_template.core.types.Hashed
 import com.urosjarc.ktor_template.core.types.TimeZoned
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
@@ -13,6 +17,8 @@ public class JsonService(prettyPrint: Boolean = false) {
                 SerializersModule {
                     contextual(ByteArray::class, BytesSerializer)
                     contextual(TimeZoned::class, TimeZonedSerializer)
+                    contextual(Encrypted::class, EncryptedSerializer)
+                    contextual(Hashed::class, HashedSerializer)
                 }
             this.encodeDefaults = true
             this.prettyPrint = prettyPrint

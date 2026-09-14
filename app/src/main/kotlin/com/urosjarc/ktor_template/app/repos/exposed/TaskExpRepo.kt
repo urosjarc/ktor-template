@@ -17,6 +17,13 @@ internal object TaskTable : ExpTable<Task>("tasks") {
     val user_id = reference("user_id", UserTable)
     val name = varchar("name", 255)
 
+    override val paginationDefinition = PaginationDefinition(
+        fields = mapOf(
+            "id" to PaginationDefinition.field(id),
+            "name" to PaginationDefinition.field(name)
+        )
+    )
+
     override fun toDomain(row: ResultRow) = Task(
         userId = Id(row[user_id].value),
         name = row[name]
