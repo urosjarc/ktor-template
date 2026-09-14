@@ -23,8 +23,7 @@ public data class Pagination(
     ) {
         @Serializable
         public enum class Direction {
-            ASC,
-            DESC,
+            ASC, DESC,
         }
     }
 
@@ -39,20 +38,21 @@ public data class Pagination(
 
         @Serializable
         public data class And(
-            val filters: List<Filter>,
-        ) : Filter
+            var filters: List<Filter>,
+        ) : Filter {
+            public constructor(vararg filters: Filter) : this(filters.toList())
+        }
 
         @Serializable
         public data class Or(
             val filters: List<Filter>,
-        ) : Filter
+        ) : Filter {
+            public constructor(vararg filters: Filter) : this(filters.toList())
+        }
 
         @Serializable
         public enum class Operator {
-            EQ, NE, GT, GTE, LT, LTE,
-            BETWEEN, CONTAINS, STARTS_WITH, ENDS_WITH,
-            IN, NOT_IN,
-            IS_NULL, IS_NOT_NULL,
+            EQ, NE, GT, GTE, LT, LTE, BETWEEN, CONTAINS, STARTS_WITH, ENDS_WITH, IN, NOT_IN, IS_NULL, IS_NOT_NULL,
         }
     }
 

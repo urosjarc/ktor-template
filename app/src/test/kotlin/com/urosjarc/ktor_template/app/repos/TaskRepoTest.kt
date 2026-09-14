@@ -1,13 +1,24 @@
 package com.urosjarc.ktor_template.app.repos
 
 import com.urosjarc.ktor_template.app.App
+import com.urosjarc.ktor_template.app.repos.exposed.PaginationCompiler
+import com.urosjarc.ktor_template.app.repos.exposed.PaginationDefinition
+import com.urosjarc.ktor_template.app.repos.exposed.TaskTable
+import com.urosjarc.ktor_template.app.repos.exposed.UserTable
 import com.urosjarc.ktor_template.core.domain.Task
 import com.urosjarc.ktor_template.core.domain.User
 import com.urosjarc.ktor_template.core.extend.random
+import com.urosjarc.ktor_template.core.types.Pagination
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonPrimitive
+import org.jetbrains.exposed.v1.core.count
+import org.jetbrains.exposed.v1.core.greaterEq
+import org.jetbrains.exposed.v1.core.like
+import org.jetbrains.exposed.v1.r2dbc.R2dbcTransaction
+import org.jetbrains.exposed.v1.r2dbc.select
+import org.junit.jupiter.api.Assertions.*
 import kotlin.test.BeforeTest
 import kotlin.test.Test
-import org.junit.jupiter.api.Assertions.*
 
 /**
  * Test class for TaskRepo
@@ -19,6 +30,7 @@ class TaskRepoTest {
     @BeforeTest
     fun setup() = runBlocking {
         App.init(inMemoryDb = true, createDropDb = true)
+        App.seed()
     }
 
     @Test
@@ -129,40 +141,40 @@ class TaskRepoTest {
      * Skipping upsert operations test as it uses SQL MERGE syntax that's not compatible with H2 in-memory database
      * In a real environment with a full PostgreSQL database, this test would be enabled
      */
-     @Test
-     fun `test upsert operations`() {
-         runBlocking {
-             var user = random<User>()
-             var task = random<Task>().copy(userId = user.id)
+    @Test
+    fun `test upsert operations`() {
+        runBlocking {
+            var user = random<User>()
+            var task = random<Task>().copy(userId = user.id)
 
-             App.services.db.transaction("TASK REPO UPSERT") { tx ->
-                 tx.repos.user.deleteAll()
+            App.services.db.transaction("TASK REPO UPSERT") { tx ->
+                tx.repos.user.deleteAll()
 
-                 // INSERT USER FIRST (REQUIRED FOR FOREIGN KEY)
-                 tx.repos.user.insert(obj = user)
+                // INSERT USER FIRST (REQUIRED FOR FOREIGN KEY)
+                tx.repos.user.insert(obj = user)
 
-                 // UPSERT NEW TASK (INSERT)
-                 tx.repos.task.upsert(obj = task)
-                 assertEquals(1, tx.repos.task.select().size)
-                 assertEquals(task.id, tx.repos.task.select(id = task.id)!!.id)
+                // UPSERT NEW TASK (INSERT)
+                tx.repos.task.upsert(obj = task)
+                assertEquals(1, tx.repos.task.select().size)
+                assertEquals(task.id, tx.repos.task.select(id = task.id)!!.id)
 
-                 // UPSERT EXISTING TASK (UPDATE)
-                 val updatedTask = task.copy(name = "upserted_task_name")
-                 tx.repos.task.upsert(obj = updatedTask)
-                 assertEquals(1, tx.repos.task.select().size)
-                 assertEquals("upserted_task_name", tx.repos.task.select(id = task.id)!!.name)
+                // UPSERT EXISTING TASK (UPDATE)
+                val updatedTask = task.copy(name = "upserted_task_name")
+                tx.repos.task.upsert(obj = updatedTask)
+                assertEquals(1, tx.repos.task.select().size)
+                assertEquals("upserted_task_name", tx.repos.task.select(id = task.id)!!.name)
 
-                 // UPSERT MULTIPLE TASKS
-                 val task2 = random<Task>().copy(userId = user.id)
-                 val updatedTask1 = updatedTask.copy(name = "multi_upserted_1")
+                // UPSERT MULTIPLE TASKS
+                val task2 = random<Task>().copy(userId = user.id)
+                val updatedTask1 = updatedTask.copy(name = "multi_upserted_1")
 
-                 tx.repos.task.upsert(objs = listOf(updatedTask1, task2))
-                 assertEquals(2, tx.repos.task.select().size)
-                 assertEquals("multi_upserted_1", tx.repos.task.select(id = task.id)!!.name)
-                 assertEquals(task2.id, tx.repos.task.select(id = task2.id)!!.id)
-             }
-         }
-     }
+                tx.repos.task.upsert(objs = listOf(updatedTask1, task2))
+                assertEquals(2, tx.repos.task.select().size)
+                assertEquals("multi_upserted_1", tx.repos.task.select(id = task.id)!!.name)
+                assertEquals(task2.id, tx.repos.task.select(id = task2.id)!!.id)
+            }
+        }
+    }
 
     @Test
     fun `test delete operations`() {
@@ -285,6 +297,66 @@ class TaskRepoTest {
                 // DELETE NON-EXISTENT USER TASKS (SHOULD NOT THROW ERROR)
                 var nonExistentUser = random<User>()
                 tx.repos.task.deleteUserTasks(id = nonExistentUser.id)
+            }
+        }
+    }
+
+    @Test
+    fun `test select task pagination operation with user join`() {
+        runBlocking {
+            App.services.db.transaction("TASK REPO SELECT WITH USER JOIN") { tx ->
+
+                val definition = PaginationDefinition(
+                    fields = mapOf(
+                        "id" to PaginationDefinition.field(TaskTable.id),
+                        "name" to PaginationDefinition.field(TaskTable.name),
+                        "username" to PaginationDefinition.field(UserTable.username),
+                    ),
+                    uniqueKey = listOf("id"),
+                    defaultSort = listOf(
+                        Pagination.Sort(
+                            column = "id",
+                            direction = Pagination.Sort.Direction.ASC,
+                        ),
+                    ),
+                )
+
+                val compiler = PaginationCompiler(
+                    definition = definition,
+                )
+
+                val pagination = Pagination(
+                    filter = Pagination.Filter.Condition(
+                        column = "username",
+                        operator = Pagination.Filter.Operator.EQ,
+                        value = JsonPrimitive("uros"),
+                    ),
+                    limit = 2,
+                )
+
+                val source = TaskTable
+                    .innerJoin(UserTable)
+                    .select(
+                        TaskTable.id,
+                        TaskTable.name,
+                        UserTable.username,
+                    )
+
+                val result = compiler
+                    .apply(
+                        request = pagination,
+                        source = source,
+                    )
+                    .query
+                    .prepareSQL(
+                        tx.raw as R2dbcTransaction,
+                        prepared = false,
+                    )
+
+                assertEquals(
+                    """SELECT TASKS.ID, TASKS."name", USERS.USERNAME FROM TASKS INNER JOIN USERS ON USERS.ID = TASKS.USER_ID WHERE USERS.USERNAME = 'uros' ORDER BY TASKS.ID ASC LIMIT 3""",
+                    result,
+                )
             }
         }
     }

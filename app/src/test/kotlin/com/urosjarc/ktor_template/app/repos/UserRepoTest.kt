@@ -221,11 +221,8 @@ class UserRepoTest {
         runBlocking {
             App.services.db.transaction("USER REPO SELECT BY PAGINATION") { tx ->
 
-                val compiler = PaginationCompiler(
-                    definition = PaginationDefinition(
-                        fields = UserTable.paginationDefinition.fields
-                    )
-                )
+                val compiler = PaginationCompiler(UserTable.paginationDefinition)
+
                 val pagination = Pagination(
                     filter = Pagination.Filter.Condition(
                         column = "type",
@@ -234,13 +231,25 @@ class UserRepoTest {
                     ),
                     limit = 2,
                 )
-                val result = compiler.apply(request = pagination, source = UserTable.selectAll())
-                    .query.prepareSQL(tx.raw as R2dbcTransaction, prepared = false)
-                    .split("WHERE ").last()
 
-                assertEquals("""USERS."type" = 'CUSTOMER' ORDER BY USERS.ID ASC LIMIT 3""", result)
+                val result = compiler
+                    .apply(
+                        request = pagination,
+                        source = UserTable.selectAll(),
+                    )
+                    .query
+                    .prepareSQL(
+                        tx.raw as R2dbcTransaction,
+                        prepared = false,
+                    )
+                    .split("WHERE ")
+                    .last()
+
+                assertEquals(
+                    """USERS."type" = 'CUSTOMER' ORDER BY USERS.ID ASC LIMIT 3""",
+                    result,
+                )
             }
-
         }
     }
 

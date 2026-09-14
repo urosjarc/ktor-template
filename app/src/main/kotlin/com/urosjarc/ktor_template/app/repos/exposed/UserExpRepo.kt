@@ -18,7 +18,7 @@ internal object UserTable : ExpTable<User>("users") {
         fields = mapOf(
             "id" to PaginationDefinition.field(id),
             "username" to PaginationDefinition.field(username),
-            "email" to PaginationDefinition.field(expression = email, paginationType = PaginationType.ENCRYPTED),
+            "email" to PaginationDefinition.field(email, PaginationType.ENCRYPTED),
             "type" to PaginationDefinition.field(type),
         )
     )
