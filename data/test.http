@@ -50,6 +50,7 @@ DELETE {{baseUrl}}/entities/users/{{userId}}
 
 ### ============================================================
 ### PAGINATION
+### "cursor": "eyJxdWVyeUhhc2giOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU1Iiwic29ydCI6W3siY29sdW1uIjoiaWQifV0sInZhbHVlcyI6WyIwMWEwYTZmZC02YTdlLTc0OGYtOTYyMi0zZWZmNzRlN2IxNzAiXX0"
 ### ============================================================
 
 ### First page
@@ -57,8 +58,10 @@ POST {{baseUrl}}/entities/users/search
 Content-Type: application/json
 
 {
-  "limit": 20
+  "limit": 4,
+  "cursor": "eyJxdWVyeUhhc2giOiJlM2IwYzQ0Mjk4ZmMxYzE0OWFmYmY0Yzg5OTZmYjkyNDI3YWU0MWU0NjQ5YjkzNGNhNDk1OTkxYjc4NTJiODU2Iiwic29ydCI6W3siY29sdW1uIjoiaWQifV0sInZhbHVlcyI6WyIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDQiXX0="
 }
+
 
 
 ### First page - sorted by username

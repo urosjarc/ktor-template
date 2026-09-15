@@ -4,6 +4,7 @@ import com.urosjarc.ktor_template.core.serializers.TimeZonedSerializer
 import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeParseException
@@ -71,6 +72,10 @@ public value class TimeZoned(public val value: ZonedDateTime) {
 		} else {
 			this.value.toLocalDateTime().toString()
 		}
+	}
+
+	public fun toOffsetDateTime(): OffsetDateTime {
+		return this.value.toOffsetDateTime()
 	}
 
 	public override fun toString(): String {

@@ -2,6 +2,8 @@ package com.urosjarc.ktor_template.app.repos.exposed
 
 import com.urosjarc.ktor_template.core.domain.Task
 import com.urosjarc.ktor_template.core.domain.User
+import com.urosjarc.ktor_template.core.extend.ext_toId
+import com.urosjarc.ktor_template.core.extend.ext_toTimeZoned
 import com.urosjarc.ktor_template.core.repos.Repo
 import com.urosjarc.ktor_template.core.repos.TaskRepo
 import com.urosjarc.ktor_template.core.types.Id
@@ -25,13 +27,19 @@ internal object TaskTable : ExpTable<Task>("tasks", Task.serializer()) {
     )
 
     override fun toDomain(row: ResultRow) = Task(
-        userId = Id(row[user_id].value),
-        name = row[name]
+        userId = row[user_id].value.ext_toId(),
+        name = row[name],
+        id = row[id].value.ext_toId(),
+        createdAt = row[createdAt].ext_toTimeZoned(),
+        updatedAt = row[updatedAt].ext_toTimeZoned(),
     )
 
     override fun toRow(tx: UpdateBuilder<Int>, domain: Task) {
         tx[name] = domain.name
         tx[user_id] = domain.userId.value
+        tx[id] = domain.id.value
+        tx[createdAt] = domain.createdAt.toOffsetDateTime()
+        tx[updatedAt] = domain.updatedAt.toOffsetDateTime()
     }
 }
 

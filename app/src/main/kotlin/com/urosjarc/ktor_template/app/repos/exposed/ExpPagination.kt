@@ -8,6 +8,7 @@ import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.core.datetime.*
 import org.jetbrains.exposed.v1.r2dbc.Query
 import java.math.BigDecimal
+import java.security.MessageDigest
 import java.util.*
 
 public enum class PaginationType {
@@ -98,18 +99,25 @@ public interface CursorCodec {
 }
 
 public data class Cursor(
+    public val queryHash: String,
     public val sort: List<Pagination.Sort>,
     public val values: List<String?>,
 )
 
 public object Base64CursorCodec : CursorCodec {
     @Serializable
-    private data class Payload(val sort: List<Pagination.Sort>, val values: List<String?>)
+    private data class Payload(val queryHash: String, val sort: List<Pagination.Sort>, val values: List<String?>)
 
     private val json = Json
 
     override fun encode(cursor: Cursor): String = Base64.getUrlEncoder().withoutPadding().encodeToString(
-        json.encodeToString(Payload(cursor.sort, cursor.values)).toByteArray(Charsets.UTF_8)
+        json.encodeToString(
+            Payload(
+                queryHash = cursor.queryHash,
+                sort = cursor.sort,
+                values = cursor.values,
+            )
+        ).encodeToByteArray()
     )
 
     override fun decode(value: String): Cursor {
@@ -123,7 +131,12 @@ public object Base64CursorCodec : CursorCodec {
         } catch (cause: Exception) {
             throw IllegalArgumentException("Invalid pagination cursor", cause)
         }
-        return Cursor(payload.sort, payload.values)
+
+        return Cursor(
+            queryHash = payload.queryHash,
+            sort = payload.sort,
+            values = payload.values,
+        )
     }
 }
 
@@ -165,7 +178,7 @@ public class PaginationCompiler(
         require(request.limit > 0) { "limit must be greater than zero" }
         val sort = normalizeSort(request.sort)
         val cursor = request.cursor?.let(cursorCodec::decode)
-        validateCursor(sort, cursor)
+        validateCursor(sort = sort, filter = request.filter, cursor = cursor)
 
         val filterExpression = request.filter?.let(::compileFilter)
         val cursorExpression = cursor?.let { compileCursor(sort, it) }
@@ -187,9 +200,40 @@ public class PaginationCompiler(
         val rows = query.toList()
         val hasNext = rows.size > request.limit
         val page = if (hasNext) rows.take(request.limit) else rows
-        val nextCursor = if (hasNext) page.lastOrNull()?.let { encodeCursor(sort, it) } else null
+        val nextCursor = if (hasNext) page.lastOrNull()?.let { encodeCursor(sort, request.filter, it) } else null
 
         return Result(query, Pagination.Page(data = page, nextCursor = nextCursor))
+    }
+
+    private fun queryHash(sort: List<Pagination.Sort>, filter: Pagination.Filter?): String {
+        val payload = buildJsonObject {
+            put("sort", Json.encodeToJsonElement(sort))
+            put("filter", Json.encodeToJsonElement(filter))
+        }
+        Base64.getUrlEncoder().withoutPadding().encodeToString(
+            MessageDigest.getInstance("SHA-256").digest(payload.toString().encodeToByteArray())
+        )
+        return MessageDigest.getInstance("SHA-256").digest().joinToString("") { "%02x".format(it) }
+    }
+
+    private fun validateCursor(
+        sort: List<Pagination.Sort>,
+        filter: Pagination.Filter?,
+        cursor: Cursor?,
+    ) {
+        if (cursor == null) return
+
+        require(cursor.queryHash == queryHash(sort, filter)) {
+            "Cursor does not belong to this query"
+        }
+
+        require(cursor.sort == sort) {
+            "Cursor sort does not match requested sort"
+        }
+
+        require(cursor.values.size == sort.size) {
+            "Cursor value count does not match sort fields"
+        }
     }
 
     private fun normalizeSort(requested: List<Pagination.Sort>): List<Pagination.Sort> {
@@ -299,8 +343,12 @@ public class PaginationCompiler(
         queryBuilder.registerArgument(field.expression.columnType as IColumnType<Any>, value)
     }
 
-    private fun encodeCursor(sort: List<Pagination.Sort>, row: ResultRow): String = cursorCodec.encode(
-        Cursor(sort, sort.map { row[itField(it.column).expression]?.toString() })
+    private fun encodeCursor(sort: List<Pagination.Sort>, filter: Pagination.Filter?, row: ResultRow): String = cursorCodec.encode(
+        Cursor(
+            queryHash = queryHash(sort, filter),
+            sort = sort,
+            values = sort.map { row[itField(it.column).expression]?.toString() },
+        )
     )
 
     private fun validateCursor(sort: List<Pagination.Sort>, cursor: Cursor?) {
@@ -345,17 +393,21 @@ public class PaginationCompiler(
 
     private fun parseCursorValue(field: PaginationField<*>, value: String): Any = parseStringValue(field, value)
 
+    private fun parseStringValue(field: PaginationField<*>, value: String): Any = parseStringValue(field.expression.columnType, value)
+
     private fun parseStringValue(
-        field: PaginationField<*>,
+        columnType: IColumnType<*>,
         value: String,
     ): Any {
-        val columnType = field.expression.columnType
-
         if (columnType is EnumerationNameColumnType<*>) {
             val enumClass = columnType.klass.java
             return enumClass.enumConstants?.firstOrNull { it.name == value } ?: error(
                 "Invalid enum value '$value'. " + "Expected one of: ${enumClass.enumConstants?.joinToString()}"
             )
+        }
+
+        if (columnType is EntityIDColumnType<*>) {
+            return parseStringValue(columnType.idColumn.columnType, value).let { columnType.valueFromDB(it) }
         }
 
         return when (columnType) {
