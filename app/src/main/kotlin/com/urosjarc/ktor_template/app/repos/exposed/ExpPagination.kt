@@ -1,6 +1,7 @@
 package com.urosjarc.ktor_template.app.repos.exposed
 
 import com.urosjarc.ktor_template.core.types.Pagination
+import com.urosjarc.ktor_template.core.types.encrypted
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -12,7 +13,7 @@ import java.security.MessageDigest
 import java.util.*
 
 public enum class PaginationType {
-    ENUM, STRING, INTEGER, DECIMAL, BOOLEAN, UUID, DATE, DATETIME, BINARY, ENCRYPTED, HASHED;
+    ENUM, STRING, INTEGER, DECIMAL, BOOLEAN, UUID, DATE, DATETIME, BINARY, ENCRYPTED;
 
     public companion object {
         public fun from(columnType: IColumnType<*>): PaginationType {
@@ -205,15 +206,27 @@ public class PaginationCompiler(
         return Result(query, Pagination.Page(data = page, nextCursor = nextCursor))
     }
 
+    private fun canonicalize(element: JsonElement): JsonElement =
+        when (element) {
+            is JsonObject -> buildJsonObject {
+                element.keys.sorted().forEach { key ->
+                    put(key, canonicalize(element.getValue(key)))
+                }
+            }
+
+            is JsonArray -> JsonArray(element.map(::canonicalize))
+            is JsonPrimitive -> element
+        }
+
     private fun queryHash(sort: List<Pagination.Sort>, filter: Pagination.Filter?): String {
-        val payload = buildJsonObject {
+        val json = buildJsonObject {
             put("sort", Json.encodeToJsonElement(sort))
             put("filter", Json.encodeToJsonElement(filter))
         }
-        Base64.getUrlEncoder().withoutPadding().encodeToString(
-            MessageDigest.getInstance("SHA-256").digest(payload.toString().encodeToByteArray())
-        )
-        return MessageDigest.getInstance("SHA-256").digest().joinToString("") { "%02x".format(it) }
+
+        return MessageDigest.getInstance("SHA-256")
+            .digest(canonicalize(json).toString().encodeToByteArray())
+            .joinToString("") { "%02x".format(it) }
     }
 
     private fun validateCursor(
@@ -239,8 +252,9 @@ public class PaginationCompiler(
     private fun normalizeSort(requested: List<Pagination.Sort>): List<Pagination.Sort> {
         val sort = if (requested.isEmpty()) definition.defaultSort else requested
         require(sort.all { definition.fields.containsKey(it.column) }) { "All sort fields must exist in pagination fields" }
-        return if (sort.any { it.column in definition.uniqueKey }) sort
-        else sort + definition.uniqueKey.map { Pagination.Sort(it, Pagination.Sort.Direction.ASC) }
+        return sort + definition.uniqueKey
+            .filterNot { key -> sort.any { it.column == key } }
+            .map { Pagination.Sort(it, Pagination.Sort.Direction.ASC) }
     }
 
     private fun compileSort(
@@ -343,11 +357,31 @@ public class PaginationCompiler(
         queryBuilder.registerArgument(field.expression.columnType as IColumnType<Any>, value)
     }
 
+    private fun encodeCursorValue(
+        field: PaginationField<*>,
+        value: Any?,
+    ): String? {
+        if (value == null) return null
+
+        return when (field.resolvedPaginationType) {
+            PaginationType.ENCRYPTED,
+            PaginationType.BINARY ->
+                Base64.getUrlEncoder()
+                    .withoutPadding()
+                    .encodeToString(value as ByteArray)
+
+            else -> value.toString()
+        }
+    }
+
     private fun encodeCursor(sort: List<Pagination.Sort>, filter: Pagination.Filter?, row: ResultRow): String = cursorCodec.encode(
         Cursor(
             queryHash = queryHash(sort, filter),
             sort = sort,
-            values = sort.map { row[itField(it.column).expression]?.toString() },
+            values = sort.map {
+                val field = itField(it.column)
+                encodeCursorValue(field, row[field.expression])
+            },
         )
     )
 
@@ -389,9 +423,28 @@ public class PaginationCompiler(
         return branches.compoundOr()
     }
 
-    private fun parseValue(field: PaginationField<*>, value: JsonElement): Any = parseStringValue(field, value.jsonPrimitive.content)
+    private fun parseValue(field: PaginationField<*>, value: JsonElement): Any {
+        val raw = value.jsonPrimitive.content
 
-    private fun parseCursorValue(field: PaginationField<*>, value: String): Any = parseStringValue(field, value)
+        return when (field.resolvedPaginationType) {
+            PaginationType.ENCRYPTED -> raw.encrypted().value
+            else -> parseStringValue(field, raw)
+        }
+    }
+
+    private fun parseCursorValue(
+        field: PaginationField<*>,
+        value: String,
+    ): Any {
+        return when (field.resolvedPaginationType) {
+            PaginationType.ENCRYPTED,
+            PaginationType.BINARY ->
+                Base64.getUrlDecoder().decode(value)
+
+            else ->
+                parseStringValue(field, value)
+        }
+    }
 
     private fun parseStringValue(field: PaginationField<*>, value: String): Any = parseStringValue(field.expression.columnType, value)
 
