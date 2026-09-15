@@ -1,5 +1,6 @@
 package com.urosjarc.ktor_template.core.types
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
@@ -29,7 +30,9 @@ public data class Pagination(
 
     @Serializable
     public sealed interface Filter {
+
         @Serializable
+        @SerialName("Condition")
         public data class Condition(
             val column: String,
             val operator: Operator,
@@ -37,6 +40,7 @@ public data class Pagination(
         ) : Filter
 
         @Serializable
+        @SerialName("And")
         public data class And(
             var filters: List<Filter>,
         ) : Filter {
@@ -44,6 +48,7 @@ public data class Pagination(
         }
 
         @Serializable
+        @SerialName("Or")
         public data class Or(
             val filters: List<Filter>,
         ) : Filter {

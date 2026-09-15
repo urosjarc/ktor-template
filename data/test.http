@@ -1,67 +1,72 @@
-@host = http://localhost:8080
-@base = {{host}}/api/v1
-@token = your-token-here
-@contentType = application/json
+### ============================================================
+### Variables
+### ============================================================
+
+@baseUrl = http://localhost:8080/api/v1
+@userId = 550e8400-e29b-41d4-a716-446655440000
+@taskId = 650e8400-e29b-41d4-a716-446655440000
 
 
-###############################################################################
-# USERS
-###############################################################################
+### ============================================================
+### USERS
+### ============================================================
 
-### Get users
-GET {{base}}/users
-Authorization: Bearer {{token}}
+### Get all users
+GET {{baseUrl}}/entities/users
 
 
-###############################################################################
-# PAGINATION
-###############################################################################
+### Get user by ID
+GET {{baseUrl}}/entities/users/{{userId}}
+
+
+### Create user
+POST {{baseUrl}}/entities/users
+Content-Type: application/json
+
+{
+  "username": "john",
+  "password": "hashed-password",
+  "email": "encrypted-email",
+  "type": "CUSTOMER"
+}
+
+
+### Update user
+PUT {{baseUrl}}/entities/users/{{userId}}
+Content-Type: application/json
+
+{
+  "id": "{{userId}}",
+  "username": "john-updated",
+  "password": "hashed-password",
+  "email": "encrypted-email",
+  "type": "CUSTOMER"
+}
+
+
+### Delete user
+DELETE {{baseUrl}}/entities/users/{{userId}}
+
+
+### ============================================================
+### PAGINATION
+### ============================================================
 
 ### First page
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
+POST {{baseUrl}}/entities/users/search
+Content-Type: application/json
 
 {
-  "page": 0,
-  "size": 10
+  "limit": 20
 }
 
 
-### Second page
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
+### First page - sorted by username
+POST {{baseUrl}}/entities/users/search
+Content-Type: application/json
 
 {
-  "page": 1,
-  "size": 10
-}
-
-
-### Small page
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 0,
-  "size": 2
-}
-
-
-###############################################################################
-# SORTING
-###############################################################################
-
-### Username ASC
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 0,
-  "size": 20,
+  "limit": 20,
   "sort": [
     {
       "column": "username",
@@ -71,399 +76,191 @@ Content-Type: {{contentType}}
 }
 
 
-### Username DESC
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
+### Sorted descending
+POST {{baseUrl}}/entities/users/search
+Content-Type: application/json
 
 {
-  "page": 0,
-  "size": 20,
+  "limit": 10,
   "sort": [
     {
-      "column": "username",
+      "column": "createdAt",
       "direction": "DESC"
     }
   ]
 }
 
 
-### Email ASC
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 0,
-  "size": 20,
-  "sort": [
-    {
-      "column": "email",
-      "direction": "ASC"
-    }
-  ]
-}
-
-
-### Type ASC
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 0,
-  "size": 20,
-  "sort": [
-    {
-      "column": "type",
-      "direction": "ASC"
-    }
-  ]
-}
-
-
-### Multiple sort fields
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 0,
-  "size": 20,
-  "sort": [
-    {
-      "column": "type",
-      "direction": "ASC"
-    },
-    {
-      "column": "username",
-      "direction": "ASC"
-    }
-  ]
-}
-
-
-###############################################################################
-# FILTERING
-###############################################################################
-
-### Find user by username
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 0,
-  "size": 20,
-  "filter": {
-    "column": "username",
-    "operator": "EQ",
-    "value": "admin"
-  }
-}
-
-
-### Username contains
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 0,
-  "size": 20,
-  "filter": {
-    "column": "username",
-    "operator": "CONTAINS",
-    "value": "adm"
-  }
-}
-
-
-### Email contains
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 0,
-  "size": 20,
-  "filter": {
-    "column": "email",
-    "operator": "CONTAINS",
-    "value": "@example.com"
-  }
-}
-
-
-### Find admins
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 0,
-  "size": 20,
-  "filter": {
-    "column": "type",
-    "operator": "EQ",
-    "value": "ADMIN"
-  }
-}
-
-
-### Find customers
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 0,
-  "size": 20,
-  "filter": {
-    "column": "type",
-    "operator": "EQ",
-    "value": "CUSTOMER"
-  }
-}
-
-
-###############################################################################
-# FILTER + SORT
-###############################################################################
-
-### Admins sorted by username
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 0,
-  "size": 10,
-  "sort": [
-    {
-      "column": "username",
-      "direction": "ASC"
-    }
-  ],
-  "filter": {
-    "column": "type",
-    "operator": "EQ",
-    "value": "ADMIN"
-  }
-}
-
-
-### Customers sorted by email
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 0,
-  "size": 10,
-  "sort": [
-    {
-      "column": "email",
-      "direction": "ASC"
-    }
-  ],
-  "filter": {
-    "column": "type",
-    "operator": "EQ",
-    "value": "CUSTOMER"
-  }
-}
-
-
-###############################################################################
-# FILTER + SORT + PAGINATION
-###############################################################################
-
-### Page 0
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 0,
-  "limit": 2,
-  "sort": [
-    {
-      "column": "username",
-      "direction": "ASC"
-    }
-  ],
-  "filter": {
-    "type": "condition",
-    "column": "type",
-    "operator": "EQ",
-    "value": "CUSTOMER"
-  }
-}
-
-### Page xasdf
-GET {{base}}/entities/users
-Content-Type: {{contentType}}
-
-### Page 1
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 1,
-  "size": 2,
-  "sort": [
-    {
-      "column": "username",
-      "direction": "ASC"
-    }
-  ],
-  "filter": {
-    "column": "type",
-    "operator": "EQ",
-    "value": "CUSTOMER"
-  }
-}
-
-
-###############################################################################
-# EMPTY RESULTS
-###############################################################################
-
-### Non-existing username
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 0,
-  "size": 20,
-  "filter": {
-    "column": "username",
-    "operator": "EQ",
-    "value": "definitely-not-existing-user"
-  }
-}
-
-
-### Page outside result set
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 9999,
-  "size": 20
-}
-
-
-###############################################################################
-# INVALID REQUESTS
-###############################################################################
-
-### Negative page
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": -1,
-  "size": 10
-}
-
-
-### Zero page size
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 0,
-  "size": 0
-}
-
-
-### Invalid sort column
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 0,
-  "size": 20,
-  "sort": [
-    {
-      "column": "doesNotExist",
-      "direction": "ASC"
-    }
-  ]
-}
-
-
-### Invalid filter column
-POST {{base}}/users/search
-Authorization: Bearer {{token}}
-Content-Type: {{contentType}}
-
-{
-  "page": 0,
-  "size": 20,
-  "filter": {
-    "column": "doesNotExist",
-    "operator": "EQ",
-    "value": "foo"
-  }
-}
-
-
-###############################################################################
-# AUTHENTICATION
-###############################################################################
-
-### No token
-GET {{base}}/users
-
-
-### Invalid token
-GET {{base}}/users
-Authorization: Bearer invalid-token
-
-
-### Search without token
-POST {{base}}/users/search
-Content-Type: {{contentType}}
-
-{
-  "page": 0,
-  "size": 10
-}
-
-
-###############################################################################
-# SWAGGER
-###############################################################################
-
-### Swagger UI
-GET {{host}}/api/docs
-
-### Create user
-POST http://localhost:8080/api/v1/entities/users
+### ============================================================
+### FILTERING
+### ============================================================
+
+### username = "john"
+POST {{baseUrl}}/entities/users/search
 Content-Type: application/json
 
 {
-  "username": "created_user",
-  "password": "password",
-  "email": "created@example.com",
-  "type": "CUSTOMER"
+  "limit": 20,
+  "filter": {
+    "type": "Condition",
+    "column": "username",
+    "operator": "EQ",
+    "value": "john"
+  }
 }
 
-### Get users
-GET http://localhost:8080/api/v1/entities/users
 
-### Get user
-GET http://localhost:8080/api/v1/entities/users/01a0a1ea-d54c-759b-8c06-49e5e247dc61
-
-### Update user
-PUT http://localhost:8080/api/v1/entities/users/01a0a1ea-d54c-759b-8c06-49e5e247dc61
+### username contains "jo"
+POST {{baseUrl}}/entities/users/search
 Content-Type: application/json
+
+{
+  "limit": 20,
+  "filter": {
+    "type": "Condition",
+    "column": "username",
+    "operator": "CONTAINS",
+    "value": "jo"
+  }
+}
+
+
+### username starts with "j"
+POST {{baseUrl}}/entities/users/search
+Content-Type: application/json
+
+{
+  "limit": 20,
+  "filter": {
+    "type": "Condition",
+    "column": "username",
+    "operator": "STARTS_WITH",
+    "value": "j"
+  }
+}
+
+
+### type = CUSTOMER
+POST {{baseUrl}}/entities/users/search
+Content-Type: application/json
+
+{
+  "limit": 20,
+  "filter": {
+    "type": "Condition",
+    "column": "type",
+    "operator": "EQ",
+    "value": "CUSTOMER"
+  }
+}
+
+
+### ============================================================
+### AND / OR
+### ============================================================
+
+### username contains "jo" AND type = CUSTOMER
+POST {{baseUrl}}/entities/users/search
+Content-Type: application/json
+
+{
+  "limit": 20,
+  "filter": {
+    "type": "And",
+    "filters": [
+      {
+        "type": "Condition",
+        "column": "username",
+        "operator": "CONTAINS",
+        "value": "jo"
+      },
+      {
+        "type": "Condition",
+        "column": "type",
+        "operator": "EQ",
+        "value": "CUSTOMER"
+      }
+    ]
+  }
+}
+
+
+### username = "john" OR username = "jane"
+POST {{baseUrl}}/entities/users/search
+Content-Type: application/json
+
+{
+  "limit": 20,
+  "filter": {
+    "type": "Or",
+    "filters": [
+      {
+        "type": "Condition",
+        "column": "username",
+        "operator": "EQ",
+        "value": "john"
+      },
+      {
+        "type": "Condition",
+        "column": "username",
+        "operator": "EQ",
+        "value": "jane"
+      }
+    ]
+  }
+}
+
+
+### ============================================================
+### CURSOR PAGINATION
+### ============================================================
+
+### First request - obtain nextCursor from response
+POST {{baseUrl}}/entities/users/search
+Content-Type: application/json
+
+{
+  "limit": 20,
+  "sort": [
+    {
+      "column": "createdAt",
+      "direction": "ASC"
+    }
+  ]
+}
+
+### ============================================================
+### TASKS
+### ============================================================
+
+### Get all tasks
+GET {{baseUrl}}/entities/tasks
+
+
+### Create task
+POST {{baseUrl}}/entities/tasks
+Content-Type: application/json
+
+{
+  "userId": "{{userId}}",
+  "name": "My first task"
+}
+
+
+### Get task by ID
+GET {{baseUrl}}/entities/tasks/{{taskId}}
+
+
+### Update task
+PUT {{baseUrl}}/entities/tasks/{{taskId}}
+Content-Type: application/json
+
+{
+  "id": "{{taskId}}",
+  "userId": "{{userId}}",
+  "name": "Updated task"
+}
+
+
+### Delete task
+DELETE {{baseUrl}}/entities/tasks/{{taskId}}

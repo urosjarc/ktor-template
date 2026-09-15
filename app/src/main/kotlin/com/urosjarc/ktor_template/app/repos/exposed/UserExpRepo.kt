@@ -8,7 +8,7 @@ import com.urosjarc.ktor_template.core.types.Hashed
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.statements.UpdateBuilder
 
-internal object UserTable : ExpTable<User>("users") {
+internal object UserTable : ExpTable<User>("users", User.serializer()) {
     val username = varchar("username", 255)
     val email = binary("email", 255)
     val password = binary("password", 255)
@@ -38,7 +38,7 @@ internal object UserTable : ExpTable<User>("users") {
     }
 }
 
-internal object UserExpRepo : Repo<User>, UserRepo, ExpRepo<User>(table = UserTable, serializer = User.serializer()) {
+internal object UserExpRepo : Repo<User>, UserRepo, ExpRepo<User>(table = UserTable) {
     override fun selectByUsername(username: String): User? {
         TODO("Not yet implemented")
     }

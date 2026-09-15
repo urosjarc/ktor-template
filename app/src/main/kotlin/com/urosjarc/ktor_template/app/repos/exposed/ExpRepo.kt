@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.singleOrNull
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.dao.id.UuidTable
 import org.jetbrains.exposed.v1.core.eq
@@ -19,22 +20,23 @@ import org.jetbrains.exposed.v1.datetime.timestampWithTimeZone
 import org.jetbrains.exposed.v1.r2dbc.*
 import java.time.OffsetDateTime
 
-internal abstract class ExpTable<T>(name: String) : UuidTable(name, uuidVersion = UuidVersion.V7) {
+internal abstract class ExpTable<T>(name: String, val serializer: KSerializer<T>) : UuidTable(name, uuidVersion = UuidVersion.V7) {
     abstract val paginationDefinition: PaginationDefinition
     val createdAt = timestampWithTimeZone("created_at")
     val updatedAt = timestampWithTimeZone("updated_at")
     abstract fun toDomain(row: ResultRow): T
     abstract fun toRow(tx: UpdateBuilder<Int>, domain: T)
+    fun toJson(row: ResultRow): JsonObject = JsonService.module.encodeToJsonElement(serializer = serializer, value = this.toDomain(row)).jsonObject
+    fun toDomain(obj: JsonObject): T = JsonService.module.decodeFromJsonElement(deserializer = serializer, element = obj)
 }
 
-internal open class ExpRepo<T : Domain<T>>(val table: ExpTable<T>, val serializer: KSerializer<T>) : Repo<T> {
+internal open class ExpRepo<T : Domain<T>>(val table: ExpTable<T>) : Repo<T> {
     override val tableName: String = table.tableName
+    override fun decode(json: JsonObject): T = table.toDomain(json)
 
     override suspend fun createTable() {
         SchemaUtils.create(table)
     }
-
-    override fun decode(json: JsonObject): T = JsonService.module.decodeFromJsonElement(serializer, json)
 
     override suspend fun count(): Long = table.selectAll().count()
 
@@ -47,10 +49,10 @@ internal open class ExpRepo<T : Domain<T>>(val table: ExpTable<T>, val serialize
         return table.selectAll().where { table.id inList ids.map { it.value } }.map(table::toDomain).toList()
     }
 
-    override suspend fun select(pagination: Pagination): Pagination.Page<T> {
+    override suspend fun select(pagination: Pagination): Pagination.Page<JsonObject> {
         val result = PaginationCompiler(definition = table.paginationDefinition).apply(request = pagination, source = table.selectAll())
         return Pagination.Page(
-            data = result.page.data.map(table::toDomain),
+            data = result.page.data.map(table::toJson),
             nextCursor = result.page.nextCursor,
         )
     }
