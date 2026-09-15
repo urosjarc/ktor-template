@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.core.datetime.*
 import org.jetbrains.exposed.v1.r2dbc.Query
 import java.math.BigDecimal
 import java.util.*
@@ -17,39 +18,21 @@ public enum class PaginationType {
             val sqlType = columnType.sqlType().uppercase().trim()
 
             return when {
-                sqlType.startsWith("VARCHAR")
-                        || sqlType.startsWith("CHAR")
-                        || sqlType.startsWith("TEXT")
-                        || sqlType.startsWith("CLOB")
-                    -> STRING
+                sqlType.startsWith("VARCHAR") || sqlType.startsWith("CHAR") || sqlType.startsWith("TEXT") || sqlType.startsWith("CLOB") -> STRING
 
-                sqlType.startsWith("TINYINT")
-                        || sqlType.startsWith("SMALLINT")
-                        || sqlType.startsWith("INTEGER")
-                        || sqlType.startsWith("INT")
-                        || sqlType.startsWith("BIGINT")
-                    -> INTEGER
+                sqlType.startsWith("TINYINT") || sqlType.startsWith("SMALLINT") || sqlType.startsWith("INTEGER") || sqlType.startsWith("INT") || sqlType.startsWith(
+                    "BIGINT"
+                ) -> INTEGER
 
-                sqlType.startsWith("REAL")
-                        || sqlType.startsWith("DOUBLE")
-                        || sqlType.startsWith("FLOAT")
-                        || sqlType.startsWith("DECIMAL")
-                        || sqlType.startsWith("NUMERIC")
-                    -> DECIMAL
+                sqlType.startsWith("REAL") || sqlType.startsWith("DOUBLE") || sqlType.startsWith("FLOAT") || sqlType.startsWith("DECIMAL") || sqlType.startsWith(
+                    "NUMERIC"
+                ) -> DECIMAL
 
-                sqlType.startsWith("BINARY")
-                        || sqlType.startsWith("VARBINARY")
-                        || sqlType.startsWith("BYTEA")
-                        || sqlType.startsWith("BLOB")
-                    -> BINARY
+                sqlType.startsWith("BINARY") || sqlType.startsWith("VARBINARY") || sqlType.startsWith("BYTEA") || sqlType.startsWith("BLOB") -> BINARY
 
-                sqlType.startsWith("TIMESTAMP")
-                        || sqlType.startsWith("DATETIME")
-                    -> DATETIME
+                sqlType.startsWith("TIMESTAMP") || sqlType.startsWith("DATETIME") -> DATETIME
 
-                sqlType.startsWith("BOOLEAN")
-                        || sqlType.startsWith("BOOL")
-                    -> BOOLEAN
+                sqlType.startsWith("BOOLEAN") || sqlType.startsWith("BOOL") -> BOOLEAN
 
                 sqlType.startsWith("UUID") -> UUID
                 sqlType.startsWith("DATE") -> DATE
@@ -154,30 +137,28 @@ public class PaginationCompiler(
     ) {
         public fun toJson(
             definition: PaginationDefinition,
-        ): JsonArray =
-            buildJsonArray {
-                for (row in page.data) {
-                    add(
-                        buildJsonObject {
-                            for ((name, field) in definition.fields) {
-                                val value = row[field.expression]
+        ): JsonArray = buildJsonArray {
+            for (row in page.data) {
+                add(
+                    buildJsonObject {
+                        for ((name, field) in definition.fields) {
+                            val value = row[field.expression]
 
-                                when (value) {
-                                    null -> put(name, JsonNull)
-                                    is String -> put(name, value)
-                                    is Int -> put(name, value)
-                                    is Long -> put(name, value)
-                                    is Boolean -> put(name, value)
-                                    is BigDecimal -> put(name, value.toString())
-                                    is UUID -> put(name, value.toString())
-                                    is Enum<*> -> put(name, value.name)
-                                    else -> put(name, value.toString())
-                                }
+                            when (value) {
+                                null -> put(name, JsonNull)
+                                is String -> put(name, value)
+                                is Int -> put(name, value)
+                                is Long -> put(name, value)
+                                is Boolean -> put(name, value)
+                                is BigDecimal -> put(name, value.toString())
+                                is UUID -> put(name, value.toString())
+                                is Enum<*> -> put(name, value.name)
+                                else -> put(name, value.toString())
                             }
                         }
-                    )
-                }
+                    })
             }
+        }
     }
 
     public suspend fun apply(request: Pagination, source: Query): Result {
@@ -193,18 +174,15 @@ public class PaginationCompiler(
             cursorExpression?.let(::add)
         }
 
-        val query = source
-            .let { query ->
-                if (predicates.isEmpty()) {
-                    query
-                } else {
-                    query.adjustWhere {
-                        this?.and(predicates.compoundAnd()) ?: predicates.compoundAnd()
-                    }
+        val query = source.let { query ->
+            if (predicates.isEmpty()) {
+                query
+            } else {
+                query.adjustWhere {
+                    this?.and(predicates.compoundAnd()) ?: predicates.compoundAnd()
                 }
             }
-            .orderBy(*compileSort(sort))
-            .limit(request.limit + 1)
+        }.orderBy(*compileSort(sort)).limit(request.limit + 1)
 
         val rows = query.toList()
         val hasNext = rows.size > request.limit
@@ -221,10 +199,12 @@ public class PaginationCompiler(
         else sort + definition.uniqueKey.map { Pagination.Sort(it, Pagination.Sort.Direction.ASC) }
     }
 
-    private fun compileSort(sort: List<Pagination.Sort>): Array<Pair<Expression<*>, SortOrder>> = sort.map {
+    private fun compileSort(
+        sort: List<Pagination.Sort>,
+    ): Array<Pair<Expression<*>, SortOrder>> = sort.map {
         itField(it.column).expression to when (it.direction) {
-            Pagination.Sort.Direction.ASC -> SortOrder.ASC
-            Pagination.Sort.Direction.DESC -> SortOrder.DESC
+            Pagination.Sort.Direction.ASC -> SortOrder.ASC_NULLS_LAST
+            Pagination.Sort.Direction.DESC -> SortOrder.DESC_NULLS_LAST
         }
     }.toTypedArray()
 
@@ -378,23 +358,50 @@ public class PaginationCompiler(
             )
         }
 
-        val sqlType = columnType.sqlType().uppercase().trim()
+        return when (columnType) {
+            is ByteColumnType -> value.toByte()
+            is UByteColumnType -> value.toUByte()
 
-        return when {
-            sqlType.startsWith("VARCHAR") || sqlType.startsWith("CHAR") || sqlType.startsWith("TEXT") || sqlType.startsWith("CLOB") -> value
-            sqlType.startsWith("TINYINT") || sqlType.startsWith("BYTEINT") -> value.toByte()
-            sqlType.startsWith("SMALLINT") -> value.toShort()
-            sqlType.startsWith("INTEGER") || sqlType.startsWith("INT") -> value.toInt()
-            sqlType.startsWith("BIGINT") -> value.toLong()
-            sqlType.startsWith("REAL") -> value.toFloat()
-            sqlType.startsWith("DOUBLE") || sqlType.startsWith("FLOAT") -> value.toDouble()
-            sqlType.startsWith("DECIMAL") || sqlType.startsWith("NUMERIC") -> value.toBigDecimal()
-            sqlType.startsWith("BOOLEAN") || sqlType.startsWith("BOOL") -> value.toBooleanStrict()
-            sqlType.startsWith("UUID") -> UUID.fromString(value)
+            is ShortColumnType -> value.toShort()
+            is UShortColumnType -> value.toUShort()
 
-            else -> error(
-                "Unsupported pagination column type ${columnType.sqlType()}"
-            )
+            is IntegerColumnType -> value.toInt()
+            is UIntegerColumnType -> value.toUInt()
+
+            is LongColumnType -> value.toLong()
+            is ULongColumnType -> value.toULong()
+
+            is FloatColumnType -> value.toFloat()
+            is DoubleColumnType -> value.toDouble()
+
+            is DecimalColumnType -> value.toBigDecimal()
+
+            is BooleanColumnType -> value.toBooleanStrict()
+
+            is CharacterColumnType -> {
+                require(value.length == 1) { "Expected a single character, got '$value'" }
+                value[0]
+            }
+
+            is StringColumnType -> value
+
+            is BasicUuidColumnType -> UUID.fromString(value)
+
+            is BasicBinaryColumnType -> value.toByteArray(Charsets.UTF_8)
+
+            is DurationColumnType<*> -> kotlin.time.Duration.parse(value)
+
+            is LocalDateColumnType<*> -> java.time.LocalDate.parse(value)
+
+            is LocalTimeColumnType<*> -> java.time.LocalTime.parse(value)
+
+            is LocalDateTimeColumnType<*> -> java.time.LocalDateTime.parse(value)
+
+            is InstantColumnType<*> -> java.time.Instant.parse(value)
+
+            is OffsetDateTimeColumnType<*> -> java.time.OffsetDateTime.parse(value)
+
+            else -> value
         }
     }
 
