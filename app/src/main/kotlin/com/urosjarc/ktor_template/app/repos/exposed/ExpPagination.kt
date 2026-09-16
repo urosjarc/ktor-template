@@ -177,31 +177,58 @@ public class PaginationCompiler(
 
     public suspend fun apply(request: Pagination, source: Query): Result {
         require(request.limit > 0) { "limit must be greater than zero" }
+
         val sort = normalizeSort(request.sort)
+        validateSortPlacement(sort)
+
         val cursor = request.cursor?.let(cursorCodec::decode)
-        validateCursor(sort = sort, filter = request.filter, cursor = cursor)
+        validateCursor(
+            sort = sort,
+            where = request.where,
+            having = request.having,
+            cursor = cursor,
+        )
 
-        val filterExpression = request.filter?.let(::compileFilter)
-        val cursorExpression = cursor?.let { compileCursor(sort, it) }
-        val predicates = buildList {
-            filterExpression?.let(::add)
-            cursorExpression?.let(::add)
-        }
+        val query = source
+            .apply {
+                request.where?.let { where ->
+                    adjustWhere {
+                        val expression = compileWhere(where)
+                        this?.and(expression) ?: expression
+                    }
+                }
 
-        val query = source.let { query ->
-            if (predicates.isEmpty()) {
-                query
-            } else {
-                query.adjustWhere {
-                    this?.and(predicates.compoundAnd()) ?: predicates.compoundAnd()
+                request.having?.let { having ->
+                    adjustHaving {
+                        val expression = compileHaving(having)
+                        this?.and(expression) ?: expression
+                    }
+                }
+
+                cursor?.let {
+                    val cursorExpression = compileCursor(sort, it)
+                    when (cursorPlacement(sort)) {
+                        FilterPlacement.WHERE -> adjustWhere {
+                            this?.and(cursorExpression) ?: cursorExpression
+                        }
+
+                        FilterPlacement.HAVING -> adjustHaving {
+                            this?.and(cursorExpression) ?: cursorExpression
+                        }
+                    }
                 }
             }
-        }.orderBy(*compileSort(sort)).limit(request.limit + 1)
+            .orderBy(*compileSort(sort))
+            .limit(request.limit + 1)
 
         val rows = query.toList()
         val hasNext = rows.size > request.limit
         val page = if (hasNext) rows.take(request.limit) else rows
-        val nextCursor = if (hasNext) page.lastOrNull()?.let { encodeCursor(sort, request.filter, it) } else null
+        val nextCursor = if (hasNext) {
+            page.lastOrNull()?.let { encodeCursor(sort, request.where, request.having, it) }
+        } else {
+            null
+        }
 
         return Result(query, Pagination.Page(data = page, nextCursor = nextCursor))
     }
@@ -218,10 +245,15 @@ public class PaginationCompiler(
             is JsonPrimitive -> element
         }
 
-    private fun queryHash(sort: List<Pagination.Sort>, filter: Pagination.Filter?): String {
+    private fun queryHash(
+        sort: List<Pagination.Sort>,
+        where: Pagination.Filter?,
+        having: Pagination.Filter?,
+    ): String {
         val json = buildJsonObject {
             put("sort", Json.encodeToJsonElement(sort))
-            put("filter", Json.encodeToJsonElement(filter))
+            put("where", Json.encodeToJsonElement(where))
+            put("having", Json.encodeToJsonElement(having))
         }
 
         return MessageDigest.getInstance("SHA-256")
@@ -231,12 +263,13 @@ public class PaginationCompiler(
 
     private fun validateCursor(
         sort: List<Pagination.Sort>,
-        filter: Pagination.Filter?,
+        where: Pagination.Filter?,
+        having: Pagination.Filter?,
         cursor: Cursor?,
     ) {
         if (cursor == null) return
 
-        require(cursor.queryHash == queryHash(sort, filter)) {
+        require(cursor.queryHash == queryHash(sort, where, having)) {
             "Cursor does not belong to this query"
         }
 
@@ -251,11 +284,27 @@ public class PaginationCompiler(
 
     private fun normalizeSort(requested: List<Pagination.Sort>): List<Pagination.Sort> {
         val sort = if (requested.isEmpty()) definition.defaultSort else requested
-        require(sort.all { definition.fields.containsKey(it.column) }) { "All sort fields must exist in pagination fields" }
+        require(sort.all { definition.fields.containsKey(it.column) }) {
+            "All sort fields must exist in pagination fields"
+        }
+
         return sort + definition.uniqueKey
             .filterNot { key -> sort.any { it.column == key } }
             .map { Pagination.Sort(it, Pagination.Sort.Direction.ASC) }
     }
+
+    private fun validateSortPlacement(sort: List<Pagination.Sort>) {
+        val placements = sort
+            .map { itField(it.column).filterPlacement }
+            .distinct()
+
+        require(placements.size == 1) {
+            "All sort fields must use the same filter placement"
+        }
+    }
+
+    private fun cursorPlacement(sort: List<Pagination.Sort>): FilterPlacement =
+        itField(sort.first().column).filterPlacement
 
     private fun compileSort(
         sort: List<Pagination.Sort>,
@@ -266,21 +315,37 @@ public class PaginationCompiler(
         }
     }.toTypedArray()
 
-    private fun compileFilter(filter: Pagination.Filter): Op<Boolean> = when (filter) {
-        is Pagination.Filter.Condition -> compileCondition(filter)
-        is Pagination.Filter.And -> {
-            require(filter.filters.isNotEmpty()) { "AND requires at least one filter" }
-            filter.filters.map(::compileFilter).compoundAnd()
+    private fun compileWhere(filter: Pagination.Filter): Op<Boolean> =
+        compileFilter(filter, FilterPlacement.WHERE)
+
+    private fun compileHaving(filter: Pagination.Filter): Op<Boolean> =
+        compileFilter(filter, FilterPlacement.HAVING)
+
+    private fun compileFilter(filter: Pagination.Filter, placement: FilterPlacement): Op<Boolean> =
+        when (filter) {
+            is Pagination.Filter.Condition ->
+                compileCondition(filter, placement)
+
+            is Pagination.Filter.And ->
+                filter.filters
+                    .map { compileFilter(it, placement) }
+                    .reduce { a, b -> a and b }
+
+            is Pagination.Filter.Or ->
+                filter.filters
+                    .map { compileFilter(it, placement) }
+                    .reduce { a, b -> a or b }
         }
 
-        is Pagination.Filter.Or -> {
-            require(filter.filters.isNotEmpty()) { "OR requires at least one filter" }
-            filter.filters.map(::compileFilter).compoundOr()
-        }
-    }
-
-    private fun compileCondition(condition: Pagination.Filter.Condition): Op<Boolean> {
+    private fun compileCondition(
+        condition: Pagination.Filter.Condition,
+        placement: FilterPlacement,
+    ): Op<Boolean> {
         val field = itField(condition.column)
+
+        require(field.filterPlacement == placement) {
+            "Field '${condition.column}' is not valid in $placement"
+        }
         return when (condition.operator) {
             Pagination.Filter.Operator.EQ -> comparison(field, "=", requiredValue(field, condition))
             Pagination.Filter.Operator.NE -> comparison(field, "<>", requiredValue(field, condition))
@@ -374,9 +439,14 @@ public class PaginationCompiler(
         }
     }
 
-    private fun encodeCursor(sort: List<Pagination.Sort>, filter: Pagination.Filter?, row: ResultRow): String = cursorCodec.encode(
+    private fun encodeCursor(
+        sort: List<Pagination.Sort>,
+        where: Pagination.Filter?,
+        having: Pagination.Filter?,
+        row: ResultRow,
+    ): String = cursorCodec.encode(
         Cursor(
-            queryHash = queryHash(sort, filter),
+            queryHash = queryHash(sort, where, having),
             sort = sort,
             values = sort.map {
                 val field = itField(it.column)
@@ -384,14 +454,6 @@ public class PaginationCompiler(
             },
         )
     )
-
-    private fun validateCursor(sort: List<Pagination.Sort>, cursor: Cursor?) {
-        if (cursor == null) return
-        require(cursor.sort == sort) { "Cursor was created for a different sort order" }
-        require(cursor.values.size == sort.size) {
-            "Cursor contains ${cursor.values.size} values but sort contains ${sort.size} columns"
-        }
-    }
 
     private fun compileCursor(sort: List<Pagination.Sort>, cursor: Cursor): Op<Boolean> {
         val branches = sort.indices.map { index ->

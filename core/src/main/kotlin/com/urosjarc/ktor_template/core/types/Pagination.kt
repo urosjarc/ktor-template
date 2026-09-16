@@ -14,7 +14,8 @@ import kotlinx.serialization.json.JsonElement
 public data class Pagination(
     val limit: Int = 20,
     val sort: List<Sort> = emptyList(),
-    val filter: Filter? = null,
+    val where: Filter? = null,
+    val having: Filter? = null,
     val cursor: String? = null,
 ) {
     @Serializable

@@ -22,6 +22,8 @@ internal object UserTable : ExpTable<User>("users", User.serializer()) {
             "username" to PaginationDefinition.field(username),
             "email" to PaginationDefinition.field(email, PaginationType.ENCRYPTED),
             "type" to PaginationDefinition.field(type),
+            "createdAt" to PaginationDefinition.field(createdAt),
+            "updatedAt" to PaginationDefinition.field(updatedAt)
         )
     )
 

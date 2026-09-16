@@ -1,0 +1,129 @@
+@baseUrl = http://localhost:8080/api/v1
+### ============================================================
+### NESTED WHERE
+### ============================================================
+
+### username contains "username" AND (type = CUSTOMER OR type = ADMIN)
+POST {{baseUrl}}/entities/users/search
+Content-Type: application/json
+
+{
+  "limit": 2,
+  "cursor": "eyJxdWVyeUhhc2giOiI3YWRmNDgwNjUzM2JkNDY3NTFhNjVlZThkMjQ2Y2Y4MjdiMGYxMGVkOGM0ZDE1YTUzYmVlYjI5MWJkY2Y1ODZkIiwic29ydCI6W3siY29sdW1uIjoiaWQifV0sInZhbHVlcyI6WyIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDIiXX0",
+  "where": {
+    "type": "And",
+    "filters": [
+      {
+        "type": "Condition",
+        "column": "username",
+        "operator": "CONTAINS",
+        "value": "username"
+      },
+      {
+        "type": "Or",
+        "filters": [
+          {
+            "type": "Condition",
+            "column": "type",
+            "operator": "EQ",
+            "value": "CUSTOMER"
+          },
+          {
+            "type": "Condition",
+            "column": "type",
+            "operator": "EQ",
+            "value": "ADMIN"
+          }
+        ]
+      }
+    ]
+  }
+}
+
+
+### (username = username_1 OR username = username_2)
+### AND type = CUSTOMER
+POST {{baseUrl}}/entities/users/search
+Content-Type: application/json
+
+{
+  "limit": 20,
+  "where": {
+    "type": "And",
+    "filters": [
+      {
+        "type": "Or",
+        "filters": [
+          {
+            "type": "Condition",
+            "column": "username",
+            "operator": "EQ",
+            "value": "username_1"
+          },
+          {
+            "type": "Condition",
+            "column": "username",
+            "operator": "EQ",
+            "value": "username_2"
+          }
+        ]
+      },
+      {
+        "type": "Condition",
+        "column": "type",
+        "operator": "EQ",
+        "value": "CUSTOMER"
+      }
+    ]
+  }
+}
+
+
+### Deep nesting
+### (username = username_1 OR (username = username_2 AND type = ADMIN))
+### AND id > 00000000-0000-0000-0000-000000000000
+POST {{baseUrl}}/entities/users/search
+Content-Type: application/json
+
+{
+  "limit": 20,
+  "where": {
+    "type": "And",
+    "filters": [
+      {
+        "type": "Or",
+        "filters": [
+          {
+            "type": "Condition",
+            "column": "username",
+            "operator": "EQ",
+            "value": "username_1"
+          },
+          {
+            "type": "And",
+            "filters": [
+              {
+                "type": "Condition",
+                "column": "username",
+                "operator": "EQ",
+                "value": "username_2"
+              },
+              {
+                "type": "Condition",
+                "column": "type",
+                "operator": "EQ",
+                "value": "ADMIN"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "Condition",
+        "column": "id",
+        "operator": "GT",
+        "value": "00000000-0000-0000-0000-000000000000"
+      }
+    ]
+  }
+}

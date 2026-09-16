@@ -10,6 +10,7 @@ import com.urosjarc.ktor_template.core.types.Id
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import org.jetbrains.exposed.v1.core.ResultRow
+import org.jetbrains.exposed.v1.core.dao.id.EntityID
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.statements.UpdateBuilder
 import org.jetbrains.exposed.v1.r2dbc.deleteWhere
@@ -22,7 +23,9 @@ internal object TaskTable : ExpTable<Task>("tasks", Task.serializer()) {
     override val paginationDefinition = PaginationDefinition(
         fields = mapOf(
             "id" to PaginationDefinition.field(id),
-            "name" to PaginationDefinition.field(name)
+            "name" to PaginationDefinition.field(name),
+            "createdAt" to PaginationDefinition.field(createdAt),
+            "updatedAt" to PaginationDefinition.field(updatedAt)
         )
     )
 
@@ -37,7 +40,7 @@ internal object TaskTable : ExpTable<Task>("tasks", Task.serializer()) {
     override fun toRow(tx: UpdateBuilder<Int>, domain: Task) {
         tx[name] = domain.name
         tx[user_id] = domain.userId.value
-        tx[id] = domain.id.value
+        tx[id] = EntityID(domain.id.value, this)
         tx[createdAt] = domain.createdAt.toOffsetDateTime()
         tx[updatedAt] = domain.updatedAt.toOffsetDateTime()
     }
