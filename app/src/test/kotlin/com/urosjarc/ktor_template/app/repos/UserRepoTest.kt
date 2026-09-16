@@ -1,6 +1,8 @@
 package com.urosjarc.ktor_template.app.repos
 
 import com.urosjarc.ktor_template.app.App
+import com.urosjarc.ktor_template.app.App.services.db
+import com.urosjarc.ktor_template.app.repos.exposed.FilterPlacement
 import com.urosjarc.ktor_template.app.repos.exposed.PaginationCompiler
 import com.urosjarc.ktor_template.app.repos.exposed.PaginationDefinition
 import com.urosjarc.ktor_template.app.repos.exposed.UserTable
@@ -9,7 +11,10 @@ import com.urosjarc.ktor_template.core.extend.random
 import com.urosjarc.ktor_template.core.types.Pagination
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
+import org.jetbrains.exposed.v1.core.QueryBuilder
+import org.jetbrains.exposed.v1.core.count
 import org.jetbrains.exposed.v1.r2dbc.R2dbcTransaction
+import org.jetbrains.exposed.v1.r2dbc.select
 import org.jetbrains.exposed.v1.r2dbc.selectAll
 import org.junit.jupiter.api.Assertions.*
 import kotlin.test.BeforeTest
@@ -217,40 +222,306 @@ class UserRepoTest {
     }
 
     @Test
-    fun `test select pagination operation`() {
+    fun `test select pagination with having cursor`() {
         runBlocking {
-            App.services.db.transaction("USER REPO SELECT BY PAGINATION") { tx ->
+            App.services.db.transaction("USER REPO SELECT PAGINATION CURSOR") { tx ->
 
-                val compiler = PaginationCompiler(UserTable.paginationDefinition)
-
-                val pagination = Pagination(
-                    filter = Pagination.Filter.Condition(
-                        column = "type",
-                        operator = Pagination.Filter.Operator.EQ,
-                        value = JsonPrimitive("CUSTOMER"),
+                val paginationDefinition = PaginationDefinition(
+                    uniqueKey = listOf("count"),
+                    defaultSort = listOf(
+                        Pagination.Sort(
+                            column = "count",
+                            direction = Pagination.Sort.Direction.DESC,
+                        ),
                     ),
-                    limit = 2,
+                    fields = mapOf(
+                        "username" to PaginationDefinition.field(
+                            expression = UserTable.username,
+                            filterPlacement = FilterPlacement.WHERE,
+                        ),
+                        "type" to PaginationDefinition.field(
+                            expression = UserTable.type,
+                            filterPlacement = FilterPlacement.WHERE,
+                        ),
+                        "count" to PaginationDefinition.field(
+                            expression = UserTable.id.count(),
+                            filterPlacement = FilterPlacement.HAVING,
+                        ),
+                    ),
                 )
 
-                val result = compiler
-                    .apply(
-                        request = pagination,
-                        source = UserTable.selectAll(),
-                    )
-                    .query
-                    .prepareSQL(
-                        tx.raw as R2dbcTransaction,
-                        prepared = false,
-                    )
-                    .split("WHERE ")
-                    .last()
+                val compiler = PaginationCompiler(paginationDefinition)
 
-                assertEquals(
-                    """USERS."type" = 'CUSTOMER' ORDER BY USERS.ID ASC LIMIT 3""",
-                    result,
+                val source = UserTable
+                    .select(
+                        UserTable.username,
+                        UserTable.type,
+                        UserTable.id.count(),
+                    )
+                    .groupBy(
+                        UserTable.username,
+                        UserTable.type,
+                    )
+
+                // ------------------------------------------------------------
+                // First page
+                // ------------------------------------------------------------
+
+                val firstPage = compiler.apply(
+                    request = Pagination(
+                        limit = 2,
+                        sort = listOf(
+                            Pagination.Sort(
+                                column = "count",
+                                direction = Pagination.Sort.Direction.DESC,
+                            ),
+                        ),
+                        where = Pagination.Filter.And(
+                            Pagination.Filter.Condition(
+                                column = "username",
+                                operator = Pagination.Filter.Operator.CONTAINS,
+                                value = JsonPrimitive("username"),
+                            ),
+                            Pagination.Filter.Or(
+                                Pagination.Filter.Condition(
+                                    column = "type",
+                                    operator = Pagination.Filter.Operator.EQ,
+                                    value = JsonPrimitive("CUSTOMER"),
+                                ),
+                                Pagination.Filter.Condition(
+                                    column = "type",
+                                    operator = Pagination.Filter.Operator.EQ,
+                                    value = JsonPrimitive("ADMIN"),
+                                ),
+                            ),
+                        ),
+                        having = Pagination.Filter.And(
+                            Pagination.Filter.Condition(
+                                column = "count",
+                                operator = Pagination.Filter.Operator.GT,
+                                value = JsonPrimitive(0),
+                            ),
+                            Pagination.Filter.Or(
+                                Pagination.Filter.Condition(
+                                    column = "count",
+                                    operator = Pagination.Filter.Operator.LT,
+                                    value = JsonPrimitive(100),
+                                ),
+                                Pagination.Filter.Condition(
+                                    column = "count",
+                                    operator = Pagination.Filter.Operator.EQ,
+                                    value = JsonPrimitive(100),
+                                ),
+                            ),
+                        ),
+                    ),
+                    source = source,
+                )
+
+                val firstSql = firstPage.query.prepareSQL(
+                    tx.raw as R2dbcTransaction,
+                    prepared = false,
+                )
+
+                assertTrue(firstSql.contains("WHERE"))
+                assertTrue(firstSql.contains("GROUP BY"))
+                assertTrue(firstSql.contains("HAVING"))
+                assertTrue(firstSql.contains("ORDER BY"))
+                assertTrue(firstSql.endsWith("LIMIT 3"))
+
+                val cursor = requireNotNull(firstPage.page.nextCursor)
+
+
+                // ------------------------------------------------------------
+                // Second page
+                // ------------------------------------------------------------
+
+                val secondPage = compiler.apply(
+                    request = Pagination(
+                        limit = 2,
+                        sort = listOf(
+                            Pagination.Sort(
+                                column = "count",
+                                direction = Pagination.Sort.Direction.DESC,
+                            ),
+                        ),
+                        where = Pagination.Filter.And(
+                            Pagination.Filter.Condition(
+                                column = "username",
+                                operator = Pagination.Filter.Operator.CONTAINS,
+                                value = JsonPrimitive("username"),
+                            ),
+                            Pagination.Filter.Or(
+                                Pagination.Filter.Condition(
+                                    column = "type",
+                                    operator = Pagination.Filter.Operator.EQ,
+                                    value = JsonPrimitive("CUSTOMER"),
+                                ),
+                                Pagination.Filter.Condition(
+                                    column = "type",
+                                    operator = Pagination.Filter.Operator.EQ,
+                                    value = JsonPrimitive("ADMIN"),
+                                ),
+                            ),
+                        ),
+                        having = Pagination.Filter.And(
+                            Pagination.Filter.Condition(
+                                column = "count",
+                                operator = Pagination.Filter.Operator.GT,
+                                value = JsonPrimitive(0),
+                            ),
+                            Pagination.Filter.Or(
+                                Pagination.Filter.Condition(
+                                    column = "count",
+                                    operator = Pagination.Filter.Operator.LT,
+                                    value = JsonPrimitive(100),
+                                ),
+                                Pagination.Filter.Condition(
+                                    column = "count",
+                                    operator = Pagination.Filter.Operator.EQ,
+                                    value = JsonPrimitive(100),
+                                ),
+                            ),
+                        ),
+                        cursor = cursor,
+                    ),
+                    source = source,
+                )
+
+                val secondSql = secondPage.query.prepareSQL(
+                    tx.raw as R2dbcTransaction,
+                    prepared = false,
+                )
+
+                // Cursor must be applied after GROUP BY, in HAVING.
+                assertTrue(secondSql.contains("HAVING"))
+
+                assertFalse(
+                    secondSql.substringBefore("GROUP BY").contains(
+                        "COUNT(USERS.ID) <"
+                    )
+                )
+
+                assertTrue(
+                    secondSql.contains("COUNT(USERS.ID) <")
+                )
+
+                assertTrue(
+                    secondSql.contains("COUNT(USERS.ID) IS NULL")
+                )
+
+                assertTrue(
+                    secondSql.contains(
+                        "ORDER BY COUNT(USERS.ID) DESC NULLS LAST"
+                    )
+                )
+
+                assertTrue(secondSql.endsWith("LIMIT 3"))
+            }
+        }
+    }
+
+    @Test
+    fun `composite unique key is appended to sort and cursor is lexicographic`() {
+        runBlocking {
+            db.transaction("") {
+                val definition = PaginationDefinition(
+                    uniqueKey = listOf("type", "id"),
+                    defaultSort = listOf(
+                        Pagination.Sort("username", Pagination.Sort.Direction.ASC),
+                    ),
+                    fields = mapOf(
+                        "id" to PaginationDefinition.field(UserTable.id),
+                        "username" to PaginationDefinition.field(UserTable.username),
+                        "type" to PaginationDefinition.field(UserTable.type),
+                    ),
+                )
+
+                val compiler = PaginationCompiler(definition)
+
+                val first = compiler.apply(
+                    request = Pagination(
+                        limit = 2,
+                    ),
+                    source = UserTable.selectAll(),
+                )
+
+                val second = compiler.apply(
+                    request = Pagination(
+                        limit = 2,
+                        cursor = first.page.nextCursor,
+                    ),
+                    source = UserTable.selectAll(),
+                )
+
+                println(second.query.prepareSQL(QueryBuilder(false)))
+
+                assertEquals(2, first.page.data.size)
+                assertNotNull(first.page.nextCursor)
+
+                assertTrue(
+                    second.query.prepareSQL(QueryBuilder(false)).contains("USERNAME")
                 )
             }
         }
     }
 
+    @Test
+    fun `cursor respects mixed sort directions with composite unique key`() {
+        runBlocking {
+            db.transaction("") {
+                val definition = PaginationDefinition(
+                    uniqueKey = listOf("type", "id"),
+                    defaultSort = listOf(
+                        Pagination.Sort("username", Pagination.Sort.Direction.ASC),
+                    ),
+                    fields = mapOf(
+                        "id" to PaginationDefinition.field(UserTable.id),
+                        "username" to PaginationDefinition.field(UserTable.username),
+                        "type" to PaginationDefinition.field(UserTable.type),
+                    ),
+                )
+
+                val compiler = PaginationCompiler(definition)
+
+                val first = compiler.apply(
+                    Pagination(
+                        limit = 2,
+                        sort = listOf(
+                            Pagination.Sort("username", Pagination.Sort.Direction.ASC),
+                            Pagination.Sort("type", Pagination.Sort.Direction.DESC),
+                        ),
+                    ),
+                    UserTable.selectAll(),
+                )
+
+                assertEquals(2, first.page.data.size)
+                assertNotNull(first.page.nextCursor)
+
+                val second = compiler.apply(
+                    Pagination(
+                        limit = 2,
+                        cursor = first.page.nextCursor,
+                        sort = listOf(
+                            Pagination.Sort("username", Pagination.Sort.Direction.ASC),
+                            Pagination.Sort("type", Pagination.Sort.Direction.DESC),
+                        ),
+                    ),
+                    UserTable.selectAll(),
+                )
+
+                val sql = second.query.prepareSQL(QueryBuilder(false))
+                println(sql)
+
+                assertTrue(sql.contains("USERS.USERNAME ASC NULLS LAST"))
+                assertTrue(sql.contains("USERS.\"type\" DESC NULLS LAST"))
+                assertTrue(sql.contains("USERS.ID ASC NULLS LAST"))
+
+                // Cursor direction must follow each sort direction.
+                assertTrue(sql.contains("USERS.USERNAME >"))
+                assertTrue(sql.contains("USERS.\"type\" <"))
+                assertTrue(sql.contains("USERS.ID >"))
+            }
+        }
+    }
 }

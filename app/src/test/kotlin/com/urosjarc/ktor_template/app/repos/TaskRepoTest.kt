@@ -326,7 +326,7 @@ class TaskRepoTest {
                 )
 
                 val pagination = Pagination(
-                    filter = Pagination.Filter.Condition(
+                    where = Pagination.Filter.Condition(
                         column = "username",
                         operator = Pagination.Filter.Operator.EQ,
                         value = JsonPrimitive("uros"),
