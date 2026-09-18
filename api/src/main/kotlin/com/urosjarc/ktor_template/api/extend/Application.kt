@@ -1,6 +1,8 @@
 package com.urosjarc.ktor_template.api.extend
 
 import com.urosjarc.ktor_template.api.Env
+import com.urosjarc.ktor_template.api.plugins.Security
+import com.urosjarc.ktor_template.api.plugins.security
 import com.urosjarc.ktor_template.api.routes.v1.entitiesRoutes
 import com.urosjarc.ktor_template.api.routes.v1.systemRoutes
 import com.urosjarc.ktor_template.app.App
@@ -8,7 +10,6 @@ import com.urosjarc.ktor_template.core.extend.ext_resourceFile
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
-import io.ktor.server.auth.*
 import io.ktor.server.metrics.micrometer.*
 import io.ktor.server.plugins.*
 import io.ktor.server.plugins.calllogging.*
@@ -98,38 +99,25 @@ fun Application.ext_module() {
 
     install(SSE)
 
-    install(Authentication) {
-        provider("custom-token") {
-            authenticate { context ->
-                val authHeader = context.call.request.headers[HttpHeaders.Authorization]
-                val token = authHeader?.takeIf { it.startsWith("Bearer ", ignoreCase = true) }?.substring(7)?.trim()
-
-                if (token != null) {
-                    val jwt = App.services.jwt.decode(jwt = token, audience = "api")
-                    if (jwt != null) {
-                        return@authenticate
-                    }
-                }
-
-                context.challenge("custom-token", AuthenticationFailedCause.InvalidCredentials) { challenge, call ->
-                    call.ext_clientUnauthorized()
-                    challenge.complete()
-                }
-            }
-        }
-    }
-
+    lateinit var sec: Security
     routing {
         route("api") {
 
             swaggerUI(path = "docs", apiFile = "openapi/documentation.yaml".ext_resourceFile())
             systemRoutes()
 
-            authenticate("custom-token") {
-                route("v1") {
-                    entitiesRoutes()
+            route("v1") {
+                sec = security {
+                    ext_configure()
+                    routes {
+                        entitiesRoutes()
+                    }
                 }
             }
         }
     }
+    monitor.subscribe(ApplicationStarted) {
+        println(sec.report().table())
+    }
+
 }

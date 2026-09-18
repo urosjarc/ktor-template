@@ -25,3 +25,7 @@ and both a build cache and a configuration cache (see `gradle.properties`).
 # Todos
 
 - Auditing (database level)
+- Storing logs to database (so that they can be queried)
+- Role based permissions on ktor routes
+- Reporting 
+- Database (insert, update) logic

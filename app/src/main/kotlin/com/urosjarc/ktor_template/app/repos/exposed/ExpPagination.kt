@@ -10,7 +10,14 @@ import org.jetbrains.exposed.v1.core.datetime.*
 import org.jetbrains.exposed.v1.r2dbc.Query
 import java.math.BigDecimal
 import java.security.MessageDigest
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.OffsetDateTime
 import java.util.*
+import kotlin.collections.iterator
+import kotlin.time.Duration
 
 public enum class PaginationType {
     ENUM, STRING, INTEGER, DECIMAL, BOOLEAN, UUID, DATE, DATETIME, BINARY, ENCRYPTED;
@@ -556,17 +563,17 @@ public class PaginationCompiler(
 
             is BasicBinaryColumnType -> value.toByteArray(Charsets.UTF_8)
 
-            is DurationColumnType<*> -> kotlin.time.Duration.parse(value)
+            is DurationColumnType<*> -> Duration.parse(value)
 
-            is LocalDateColumnType<*> -> java.time.LocalDate.parse(value)
+            is LocalDateColumnType<*> -> LocalDate.parse(value)
 
-            is LocalTimeColumnType<*> -> java.time.LocalTime.parse(value)
+            is LocalTimeColumnType<*> -> LocalTime.parse(value)
 
-            is LocalDateTimeColumnType<*> -> java.time.LocalDateTime.parse(value)
+            is LocalDateTimeColumnType<*> -> LocalDateTime.parse(value)
 
-            is InstantColumnType<*> -> java.time.Instant.parse(value)
+            is InstantColumnType<*> -> Instant.parse(value)
 
-            is OffsetDateTimeColumnType<*> -> java.time.OffsetDateTime.parse(value)
+            is OffsetDateTimeColumnType<*> -> OffsetDateTime.parse(value)
 
             else -> value
         }
