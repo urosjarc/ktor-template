@@ -14,7 +14,7 @@ suspend fun main() {
     App.seed()
 
     println(App.services.jwt.encode(
-        payload = App.services.json.encode(random<User>().copy(type=User.Type.GUEST)),
+        payload = App.services.json.encode(random<User>().copy(type=User.Type.ADMIN)),
         audiences = listOf("api"),
         expiration = 1.hours
     ))

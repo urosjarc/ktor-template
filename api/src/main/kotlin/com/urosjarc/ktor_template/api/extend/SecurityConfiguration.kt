@@ -7,6 +7,7 @@ fun SecurityConfig.ext_configure() {
         "ADMIN",
         "*:*",
         "!DELETE:/entities/users/**",
+        "!GET:/test-security",
     )
 
     role(

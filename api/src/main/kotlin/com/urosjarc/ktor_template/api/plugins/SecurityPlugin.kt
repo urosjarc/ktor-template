@@ -939,48 +939,63 @@ private val SecurityPlugin = object : BaseRouteScopedPlugin<
         pipeline: ApplicationCallPipeline,
         configure: SecurityConfig.() -> Unit,
     ): SecurityPluginInstance {
+
         val config = SecurityConfig().apply(configure)
 
         val instance = SecurityPluginInstance(config)
 
         config.root.routingNode().environment.monitor.subscribe(ApplicationStarted) {
-/*
- * The protected route tree is complete here.
-*/
+            /*
+             * The protected route tree is complete here.
+             */
             instance.compile()
         }
-        AuthenticationChecked.install(pipeline) { call ->
-            val routingCall = call as? RoutingPipelineCall ?: error(
-                "Security requires a Ktor routing call.",
-            )
+
+        pipeline.intercept(ApplicationCallPipeline.Call) {
 
             val user = call.principal<User>()
-                ?: error("Authenticated User is missing.")
 
-            val runtime = instance.runtime()
+            if (user == null) {
+                /*
+                 * Authentication did not establish a User.
+                 *
+                 * Do not create an authenticated-user MDC context.
+                 */
+                proceed()
+                return@intercept
+            }
 
-            val roleBit = runtime.roleBit(
-                user.type.name,
-            )
+            /*
+             * Authentication has completed.
+             *
+             * The authenticated User is available from the ApplicationCall.
+             *
+             * Keep the MDC active for both authorization and the remainder
+             * of the request.
+             */
+            call.application.mdcProvider.withMDCBlock(call) {
 
-            if (!runtime.allowed(
+                val routingCall = call as? RoutingPipelineCall ?: error(
+                    "Security requires a Ktor routing call.",
+                )
+
+                val runtime = instance.runtime()
+
+                val roleBit = runtime.roleBit(
+                    user.type.name,
+                )
+
+                val allowed = runtime.allowed(
                     route = routingCall.route,
                     pathParameters = routingCall.pathParameters,
                     roleBit = roleBit,
                 )
-            ) {
-                call.ext_clientForbiddenAccess()
-            }
-        }
 
-        pipeline.intercept(ApplicationCallPipeline.Call) {
-            val user = call.principal<User>()
-
-            if (user != null) {
-                call.application.mdcProvider.withMDCBlock(call) {
-                    proceed()
+                if (!allowed) {
+                    call.ext_clientForbiddenAccess()
+                    return@withMDCBlock
                 }
-            } else {
+
                 proceed()
             }
         }

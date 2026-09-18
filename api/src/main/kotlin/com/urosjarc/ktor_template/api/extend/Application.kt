@@ -155,29 +155,27 @@ fun Application.ext_module() {
             systemRoutes()
 
             route("v1") {
-                sec = security {
-                    ext_configure()
-                    routes {
-                        entitiesRoutes()
+                authenticate("custom-token") {
+                    sec = security {
+                        ext_configure()
+                        routes {
+                            entitiesRoutes()
+
+                            get("/test-security") {
+                                logger.info("INSIDE TEST HANDLER")
+
+                                val user = call.principal<User>()
+                                    ?: error("Authenticated User is missing.")
+
+                                call.respond(
+                                    mapOf(
+                                        "userId" to user.id.value.toString(),
+                                        "role" to user.type.name,
+                                    )
+                                )
+                            }
+                        }
                     }
-                }
-            }
-        }
-        security {
-            authenticate("custom-token") {
-                ext_configure()
-                get("/test-security") {
-                    logger.info("INSIDE TEST HANDLER")
-
-                    val user = call.principal<User>()
-                        ?: error("Authenticated User is missing.")
-
-                    call.respond(
-                        mapOf(
-                            "userId" to user.id.value.toString(),
-                            "role" to user.type.name,
-                        )
-                    )
                 }
             }
         }
