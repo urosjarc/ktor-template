@@ -136,17 +136,15 @@ fun Application.ext_module() {
     }
     install(CallLogging) {
         callIdMdc("requestId")
+        mdc("userId") { call ->
+            call.principal<User>()?.id?.value?.toString()
+        }
         format { call ->
             val status = call.response.status()!!
             val httpMethod = call.request.httpMethod.value
-            val path = call.request.path()
-            val host = call.request.host()
-            val parameters = Json.encodeToJsonElement(call.request.queryParameters.entries())
-
             "Status: $status, HTTP method: $httpMethod"
         }
     }
-
     install(SSE)
 
     lateinit var sec: Security
@@ -169,6 +167,8 @@ fun Application.ext_module() {
             authenticate("custom-token") {
                 ext_configure()
                 get("/test-security") {
+                    logger.info("INSIDE TEST HANDLER")
+
                     val user = call.principal<User>()
                         ?: error("Authenticated User is missing.")
 

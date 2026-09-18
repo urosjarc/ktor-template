@@ -5,6 +5,7 @@ import com.urosjarc.ktor_template.core.domain.User
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
+import io.ktor.server.logging.mdcProvider
 import io.ktor.server.routing.*
 import io.ktor.util.*
 import java.util.*
@@ -948,7 +949,6 @@ private val SecurityPlugin = object : BaseRouteScopedPlugin<
 */
             instance.compile()
         }
-
         AuthenticationChecked.install(pipeline) { call ->
             val routingCall = call as? RoutingPipelineCall ?: error(
                 "Security requires a Ktor routing call.",
@@ -970,6 +970,18 @@ private val SecurityPlugin = object : BaseRouteScopedPlugin<
                 )
             ) {
                 call.ext_clientForbiddenAccess()
+            }
+        }
+
+        pipeline.intercept(ApplicationCallPipeline.Call) {
+            val user = call.principal<User>()
+
+            if (user != null) {
+                call.application.mdcProvider.withMDCBlock(call) {
+                    proceed()
+                }
+            } else {
+                proceed()
             }
         }
 

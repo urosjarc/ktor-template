@@ -19,6 +19,7 @@ public data class User(
 
     public enum class Type {
         ADMIN,
-        CUSTOMER
+        CUSTOMER,
+        GUEST,
     }
 }
