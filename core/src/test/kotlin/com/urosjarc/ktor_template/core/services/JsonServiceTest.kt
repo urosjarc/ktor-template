@@ -15,7 +15,7 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalUuidApi::class)
 class JsonServiceTest {
 
-    private val jsonService = JsonService(prettyPrint = true)
+    private val jsonService = JsonService
 
     // Helper function to create a User for testing
     private fun createTestUser(): User {
@@ -24,8 +24,6 @@ class JsonServiceTest {
             username = "testuser",
             password = "password123".hashed(),
             email = "test@example.com".encrypted(),
-            phone = "+1234567890".encrypted(),
-            address = "123 Test Street".encrypted(),
             createdAt = TimeZoned.nowUtc(),
             updatedAt = TimeZoned.nowUtc(),
             type = User.Type.ADMIN,
@@ -67,8 +65,6 @@ class JsonServiceTest {
         assertEquals(originalUser.username, decodedUser.username)
         assertEquals(originalUser.password.toString(), decodedUser.password.toString())
         assertEquals(originalUser.email.toString(), decodedUser.email.toString())
-        assertEquals(originalUser.phone.toString(), decodedUser.phone.toString())
-        assertEquals(originalUser.address.toString(), decodedUser.address.toString())
         assertEquals(originalUser.createdAt.toString(), decodedUser.createdAt.toString())
         assertEquals(originalUser.updatedAt.toString(), decodedUser.updatedAt.toString())
     }
@@ -81,8 +77,6 @@ class JsonServiceTest {
             username = "Special \"User\" with \\ and / characters!",
             password = "password123".hashed(),
             email = "test@example.com".encrypted(),
-            phone = "+1234567890".encrypted(),
-            address = "123 Test Street".encrypted(),
             createdAt = TimeZoned.nowUtc(),
             updatedAt = TimeZoned.nowUtc(),
             type = User.Type.ADMIN,

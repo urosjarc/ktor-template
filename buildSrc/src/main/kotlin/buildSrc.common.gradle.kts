@@ -34,6 +34,7 @@ dependencies {
     implementation(libs.findBundle("logging").get())
     runtimeOnly(libs.findBundle("logging-runtime").get())
     testImplementation(kotlin("test"))
+    testImplementation(libs.findBundle("kotlinx-test").get())
 }
 configurations.configureEach {
     exclude(group = "ch.qos.logback", module = "logback-classic")

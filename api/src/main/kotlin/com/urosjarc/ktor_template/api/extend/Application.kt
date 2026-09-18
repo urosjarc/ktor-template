@@ -6,12 +6,15 @@ import com.urosjarc.ktor_template.api.plugins.security
 import com.urosjarc.ktor_template.api.routes.v1.entitiesRoutes
 import com.urosjarc.ktor_template.api.routes.v1.systemRoutes
 import com.urosjarc.ktor_template.app.App
+import com.urosjarc.ktor_template.core.domain.User
 import com.urosjarc.ktor_template.core.extend.ext_resourceFile
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.auth.*
 import io.ktor.server.metrics.micrometer.*
 import io.ktor.server.plugins.*
+import io.ktor.server.plugins.callid.*
 import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
@@ -19,8 +22,10 @@ import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.plugins.swagger.*
 import io.ktor.server.request.*
 import io.ktor.server.resources.*
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
+import io.ktor.util.*
 import io.micrometer.core.instrument.binder.jvm.*
 import io.micrometer.core.instrument.binder.logging.Log4j2Metrics
 import io.micrometer.core.instrument.binder.system.ProcessorMetrics
@@ -85,7 +90,52 @@ fun Application.ext_module() {
             .build()
     }
 
+    install(CallId) {
+        generate { generateNonceBlocking() }
+    }
+    install(Authentication) {
+        provider("custom-token") {
+            authenticate { context ->
+                val authHeader =
+                    context.call.request.headers[HttpHeaders.Authorization]
+
+                val token = authHeader
+                    ?.takeIf {
+                        it.startsWith(
+                            prefix = "Bearer ",
+                            ignoreCase = true,
+                        )
+                    }
+                    ?.substring(7)
+                    ?.trim()
+
+                if (token != null) {
+                    val jwt = App.services.jwt.decode(
+                        jwt = token,
+                        audience = "api",
+                    )
+
+                    if (jwt != null) {
+                        val user = App.services.json.decode<User>(jwt.payload)
+
+                        context.principal(user)
+
+                        return@authenticate
+                    }
+                }
+
+                context.challenge(
+                    "custom-token",
+                    AuthenticationFailedCause.InvalidCredentials,
+                ) { challenge, call ->
+                    call.ext_clientUnauthorized()
+                    challenge.complete()
+                }
+            }
+        }
+    }
     install(CallLogging) {
+        callIdMdc("requestId")
         format { call ->
             val status = call.response.status()!!
             val httpMethod = call.request.httpMethod.value
@@ -112,6 +162,22 @@ fun Application.ext_module() {
                     routes {
                         entitiesRoutes()
                     }
+                }
+            }
+        }
+        security {
+            authenticate("custom-token") {
+                ext_configure()
+                get("/test-security") {
+                    val user = call.principal<User>()
+                        ?: error("Authenticated User is missing.")
+
+                    call.respond(
+                        mapOf(
+                            "userId" to user.id.value.toString(),
+                            "role" to user.type.name,
+                        )
+                    )
                 }
             }
         }

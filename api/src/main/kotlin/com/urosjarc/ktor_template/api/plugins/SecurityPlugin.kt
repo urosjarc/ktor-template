@@ -1,9 +1,10 @@
 package com.urosjarc.ktor_template.api.plugins
 
 import com.urosjarc.ktor_template.api.extend.ext_clientForbiddenAccess
-import com.urosjarc.ktor_template.api.extend.ext_clientUnauthorized
+import com.urosjarc.ktor_template.core.domain.User
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.auth.*
 import io.ktor.server.routing.*
 import io.ktor.util.*
 import java.util.*
@@ -36,8 +37,6 @@ class SecurityConfig internal constructor() {
 
     private val policyBuilder = AuthorizationPolicy.Builder()
 
-    private var jwtConfig: JwtConfig? = null
-
     private var pathValuesConfig = AuthorizationPathValues.EMPTY
 
     private val routeBuilders = mutableListOf<Route.() -> Unit>()
@@ -53,16 +52,6 @@ class SecurityConfig internal constructor() {
      * Runtime is always default-deny, regardless of this setting.
      */
     var failOnUncoveredRoute: Boolean = true
-
-    fun jwt(
-        block: JwtConfig.() -> Unit,
-    ) {
-        check(jwtConfig == null) {
-            "JWT configuration has already been defined."
-        }
-
-        jwtConfig = JwtConfig().apply(block)
-    }
 
     fun role(
         name: String,
@@ -96,99 +85,10 @@ class SecurityConfig internal constructor() {
 
     internal fun policy(): AuthorizationPolicy = policyBuilder.build()
 
-    internal fun jwt(): JwtConfig = jwtConfig ?: error(
-        "JWT configuration is missing. " + "Configure jwt { ... } inside security { ... }.",
-    )
-
     internal fun pathValues(): AuthorizationPathValues = pathValuesConfig
 
     internal fun routeBuilders(): List<Route.() -> Unit> = routeBuilders.toList()
 }
-
-// =============================================================================
-// JWT authentication
-// =============================================================================
-
-class JwtConfig {
-
-    /**
-     * Enables JWT extraction and validation.
-     *
-     * Disable this for tests when you want to exercise route authorization
-     * without creating/signing real JWTs.
-     */
-    var enabled: Boolean = true
-
-    /**
-     * Used only when [enabled] is false.
-     *
-     * The role is still passed through the normal authorization compiler.
-     */
-    var testRole: String? = null
-
-    /**
-     * Required JWT audience.
-     */
-    var audience: String = ""
-
-    private var authenticator: (suspend JwtConfig.(
-        call: ApplicationCall,
-        token: String,
-    ) -> SecurityIdentity?)? = null
-
-    /**
-     * The block is responsible for decoding and validating the JWT.
-     *
-     * [audience] is available directly inside the block.
-     *
-     * Return null when the token is invalid.
-     */
-    fun authenticate(
-        block: suspend JwtConfig.(
-            call: ApplicationCall,
-            token: String,
-        ) -> SecurityIdentity?,
-    ) {
-        check(authenticator == null) {
-            "JWT authentication has already been configured."
-        }
-
-        authenticator = block
-    }
-
-    internal suspend fun authenticate(
-        call: ApplicationCall,
-        token: String,
-    ): SecurityIdentity? {
-        if (!enabled) {
-            val role = testRole ?: error(
-                "JWT checking is disabled, but JwtConfig.testRole is not configured.",
-            )
-
-            return SecurityIdentity(role = role)
-        }
-
-        require(audience.isNotBlank()) {
-            "JWT audience must not be blank."
-        }
-
-        return (authenticator ?: error(
-            "JWT authenticator is missing. " + "Configure authenticate { ... } inside jwt { ... }.",
-        )).invoke(
-            this,
-            call,
-            token,
-        )
-    }
-}
-
-data class SecurityIdentity(
-    val role: String,
-)
-
-private val SecurityIdentityAttribute = AttributeKey<SecurityIdentity>("SecurityIdentity")
-
-fun ApplicationCall.securityIdentity(): SecurityIdentity = attributes[SecurityIdentityAttribute]
 
 // =============================================================================
 // Authorization rules
@@ -1020,33 +920,6 @@ private class SecurityPluginInstance(
         )
     }
 
-    suspend fun authenticate(
-        call: ApplicationCall,
-    ): SecurityIdentity? {
-        val jwt = config.jwt()
-
-        if (!jwt.enabled) {
-            return jwt.authenticate(
-                call = call,
-                token = "",
-            )
-        }
-
-        val header = call.request.headers[HttpHeaders.Authorization] ?: return null
-
-        val token = header.takeIf {
-            it.startsWith(
-                prefix = "Bearer ",
-                ignoreCase = true,
-            )
-        }?.substring(7)?.trim()?.takeIf(String::isNotEmpty) ?: return null
-
-        return jwt.authenticate(
-            call = call,
-            token = token,
-        )
-    }
-
     fun runtime(): SecurityRuntime = runtime ?: error(
         "Security has not been compiled yet.",
     )
@@ -1076,30 +949,18 @@ private val SecurityPlugin = object : BaseRouteScopedPlugin<
             instance.compile()
         }
 
-        pipeline.intercept(
-            ApplicationCallPipeline.Plugins,
-        ) {
+        AuthenticationChecked.install(pipeline) { call ->
             val routingCall = call as? RoutingPipelineCall ?: error(
                 "Security requires a Ktor routing call.",
             )
 
-            val identity = instance.authenticate(call)
-
-            if (identity == null) {
-                call.ext_clientUnauthorized()
-                finish()
-                return@intercept
-            }
-
-            call.attributes.put(
-                SecurityIdentityAttribute,
-                identity,
-            )
+            val user = call.principal<User>()
+                ?: error("Authenticated User is missing.")
 
             val runtime = instance.runtime()
 
             val roleBit = runtime.roleBit(
-                identity.role,
+                user.type.name,
             )
 
             if (!runtime.allowed(
@@ -1109,7 +970,6 @@ private val SecurityPlugin = object : BaseRouteScopedPlugin<
                 )
             ) {
                 call.ext_clientForbiddenAccess()
-                finish()
             }
         }
 
@@ -1239,8 +1099,7 @@ data class SecurityReport(
             roles.forEach { role ->
                 append("  ")
                 append(
-                    if (role.name in route.allowedRoles)
-                        "X"
+                    if (role.name in route.allowedRoles) "X"
                     else {
                         " "
                     }.padEnd(
