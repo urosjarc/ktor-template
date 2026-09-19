@@ -28,6 +28,7 @@ r2dbc-pool = {module = "io.r2dbc:r2dbc-pool", version = "1.0.2.RELEASE" }
 
 # DATABASE
 postgresql = { module = "org.postgresql:postgresql", version = "42.7.13" }
+r2dbc-postgresql = { module = "org.postgresql:r2dbc-postgresql", version = "1.1.2.RELEASE" }
 h2database-h2 = { module = "com.h2database:h2", version = "2.4.240" }
 h2database-r2dbc = { module = "io.r2dbc:r2dbc-h2", version = "1.1.0.RELEASE" }
 
@@ -35,6 +36,7 @@ h2database-r2dbc = { module = "io.r2dbc:r2dbc-h2", version = "1.1.0.RELEASE" }
 log4j-api-kotlin = { module = "org.apache.logging.log4j:log4j-api-kotlin", version = "1.5.0" }
 log4j-core = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
 log4j-slf4j2 = { module = "org.apache.logging.log4j:log4j-slf4j2-impl", version.ref = "log4j" }
+log4j-jdbc-dbcp2 = { module = "org.apache.logging.log4j:log4j-jdbc-dbcp2", version.ref = "log4j" }
 
 # SECURITY
 google-tink = { module = "com.google.crypto.tink:tink", version = "1.16.0" }
@@ -85,13 +87,13 @@ kotlinx = ["kotlinx-coroutines", "kotlinx-serialization-json"]
 kotlinx-test = ["kotlinx-coroutines-test"]
 
 logging = ["log4j-api-kotlin"]
-logging-runtime = ["log4j-core", "log4j-slf4j2"]
+logging-runtime = ["log4j-core", "log4j-slf4j2", "log4j-jdbc-dbcp2"]
 
 security = ["google-tink", "spring-security-core"]
 security-runtime = ["bouncycastle-prov"]
 
 database = ["exposed-core", "exposed-r2dbc", "exposed-kotlin-datetime", "r2dbc-pool" ]
-database-runtime = ["postgresql", "h2database-h2", "h2database-r2dbc"]
+database-runtime = ["postgresql", "r2dbc-postgresql", "h2database-h2", "h2database-r2dbc"]
 
 buildsrc = [
     "kotlin-gradle-plugin",

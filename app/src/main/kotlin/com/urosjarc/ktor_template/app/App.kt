@@ -11,6 +11,7 @@ import com.urosjarc.ktor_template.core.services.JwtService
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.apache.logging.log4j.kotlin.logger
+import org.jetbrains.exposed.v1.core.vendors.PostgreSQLDialect
 import kotlin.concurrent.atomics.AtomicBoolean
 
 public object App {
@@ -36,7 +37,11 @@ public object App {
         logger.info("App.init(PID=${Env.PID})")
 
         // SERVICES
-        services.db = ExposedDbService(statsSize = 1_000_000)
+        services.db = ExposedDbService(
+            databaseDialect = PostgreSQLDialect(),
+            url = "r2dbc:${Env.DB_TYPE}://${Env.DB_USER}:${Env.DB_PASSWORD}@${Env.DB_DOMAIN}:${Env.DB_PORT}/${Env.DB_NAME}",
+            statsSize = 1_000_000
+        )
         services.json = JsonService
         services.jwt = TinkeyJwtService(privateKeyset = Env.KEYSET_JWT)
         // SERVICES

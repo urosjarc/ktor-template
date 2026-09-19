@@ -29,3 +29,5 @@ and both a build cache and a configuration cache (see `gradle.properties`).
 - Role based permissions on ktor routes
 - Reporting 
 - Database (insert, update) logic
+- Versioning (env, logs, changelog, db)
+- When database started (logs)

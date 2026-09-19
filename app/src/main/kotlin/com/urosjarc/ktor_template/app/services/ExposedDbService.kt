@@ -10,7 +10,7 @@ import io.r2dbc.spi.ConnectionFactories
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.apache.logging.log4j.kotlin.logger
-import org.jetbrains.exposed.v1.core.vendors.H2Dialect
+import org.jetbrains.exposed.v1.core.vendors.DatabaseDialect
 import org.jetbrains.exposed.v1.r2dbc.R2dbcDatabase
 import org.jetbrains.exposed.v1.r2dbc.R2dbcDatabaseConfig
 import org.jetbrains.exposed.v1.r2dbc.R2dbcTransaction
@@ -21,8 +21,8 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.measureTime
 import kotlin.time.toJavaDuration
 
-internal class ExposedDbService(private val statsSize: Long) : DbService {
-    private val connectionFactory = ConnectionFactories.get("r2dbc:h2:file:///./data/mydb")
+internal class ExposedDbService(databaseDialect: DatabaseDialect, url: String, private val statsSize: Long) : DbService {
+    private val connectionFactory = ConnectionFactories.get(url)
 
     private val poolConfiguration = ConnectionPoolConfiguration.builder(connectionFactory)
         .initialSize(5)
@@ -35,7 +35,7 @@ internal class ExposedDbService(private val statsSize: Long) : DbService {
     private val database = R2dbcDatabase.connect(
         connectionFactory = pool,
         databaseConfig = R2dbcDatabaseConfig.Builder().apply {
-            explicitDialect = H2Dialect()
+            explicitDialect = databaseDialect
         }
     )
 

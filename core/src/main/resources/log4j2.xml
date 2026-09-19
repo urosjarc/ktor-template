@@ -7,6 +7,21 @@
             <PatternLayout pattern="%d{yyyy.MM.dd HH:mm:ss.SSS} | %40t | reqId=%X{requestId},userId=%X{userId} | %40c:%-3line | %-5level | %msg%n"/>
         </Console>
 
+        <JDBC name="Database" tableName="logs" bufferSize="10" ignoreExceptions="true">
+            <PoolingDriver connectionString="jdbc:${env:DB_TYPE}://${env:DB_DOMAIN}:${env:DB_PORT}/${env:DB_NAME}"
+                           userName="${env:DB_USER}"
+                           password="${env:DB_PASSWORD}" poolName="LogDatabase"/> <!-- UUID -->
+            <ColumnMapping name="timestamp" pattern="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX}" columnType="java.sql.Timestamp"/>
+            <ColumnMapping name="level" pattern="%level"/>
+            <ColumnMapping name="marker" pattern="%marker"/>
+            <ColumnMapping name="logger" pattern="%logger"/>
+            <ColumnMapping name="line" pattern="%line"/>
+            <ColumnMapping name="message" pattern="%message"/>
+            <ColumnMapping name="thread" pattern="%thread"/>
+            <ColumnMapping name="request_id" pattern="%X{requestId}"/>
+            <ColumnMapping name="user_id" pattern="%X{userId}"/>
+            <ColumnMapping name="exception" pattern="%throwable"/>
+        </JDBC>
 
         <RollingRandomAccessFile name="File-trace"
                                  append="true"
@@ -65,6 +80,11 @@
                includeLocation="true">
             <AppenderRef ref="Console"/>
         </Async>
+        <Async name="Async-Database"
+               includeLocation="true"
+               ignoreExceptions="true">
+            <AppenderRef ref="Database"/>
+        </Async>
         <Async name="Async-File-trace"
                includeLocation="true">
             <AppenderRef ref="File-trace"/>
@@ -87,11 +107,15 @@
     <Loggers>
         <Root includeLocation="true" level="TRACE">
             <AppenderRef level="trace" ref="Async-Console"/>
+            <AppenderRef level="trace" ref="Async-Database"/>
             <AppenderRef level="trace" ref="Async-File-trace"/>
             <AppenderRef level="info" ref="Async-File-info"/>
             <AppenderRef level="warn" ref="Async-File-warn"/>
             <AppenderRef level="error" ref="Async-File-error"/>
         </Root>
         <Logger name="io.netty" level="INFO"/>
+        <Logger name="io.r2dbc" level="INFO"/>
+        <Logger name="reactor.netty" level="INFO"/>
+        <Logger name="reactor.pool" level="INFO"/>
     </Loggers>
 </Configuration>
