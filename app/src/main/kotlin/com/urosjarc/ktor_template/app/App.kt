@@ -40,7 +40,11 @@ public object App {
         services.db = ExposedDbService(
             databaseDialect = PostgreSQLDialect(),
             url = "r2dbc:${Env.DB_TYPE}://${Env.DB_USER}:${Env.DB_PASSWORD}@${Env.DB_DOMAIN}:${Env.DB_PORT}/${Env.DB_NAME}",
-            statsSize = 1_000_000
+            statsSize = 1_000_000,
+            auditThreadDbMap = mapOf(
+                "userId" to "app.user_id",
+                "requestId" to "app.request_id",
+            )
         )
         services.json = JsonService
         services.jwt = TinkeyJwtService(privateKeyset = Env.KEYSET_JWT)

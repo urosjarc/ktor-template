@@ -9,7 +9,9 @@ import io.r2dbc.pool.ConnectionPoolConfiguration
 import io.r2dbc.spi.ConnectionFactories
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.apache.logging.log4j.ThreadContext
 import org.apache.logging.log4j.kotlin.logger
+import org.jetbrains.exposed.v1.core.TextColumnType
 import org.jetbrains.exposed.v1.core.vendors.DatabaseDialect
 import org.jetbrains.exposed.v1.r2dbc.R2dbcDatabase
 import org.jetbrains.exposed.v1.r2dbc.R2dbcDatabaseConfig
@@ -21,7 +23,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.measureTime
 import kotlin.time.toJavaDuration
 
-internal class ExposedDbService(databaseDialect: DatabaseDialect, url: String, private val statsSize: Long) : DbService {
+internal class ExposedDbService(databaseDialect: DatabaseDialect, url: String, private val statsSize: Long, private val auditThreadDbMap: Map<String, String>) : DbService {
     private val connectionFactory = ConnectionFactories.get(url)
 
     private val poolConfiguration = ConnectionPoolConfiguration.builder(connectionFactory)
@@ -80,6 +82,14 @@ internal class ExposedDbService(databaseDialect: DatabaseDialect, url: String, p
 
 
         val data = suspendTransaction(db = this.database) {
+
+            auditThreadDbMap.forEach { (threadContextKey, dbConfigKey) ->
+                exec(
+                    stmt = "SELECT set_config('$dbConfigKey', ?, true)",
+                    args = listOf(TextColumnType() to (ThreadContext.get(threadContextKey) ?: "")),
+                )
+            }
+
             val repos = ExposedRepos(tx = this) // Pass the transaction or repos wrapper here
 
             try {

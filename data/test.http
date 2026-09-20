@@ -22,30 +22,35 @@ GET {{baseUrl}}/entities/users/{{userId}}
 ### Create user
 POST {{baseUrl}}/entities/users
 Content-Type: application/json
+Authorization: Bearer eyJraWQiOiJPUDlCNUEiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOlsiYXBpIl0sInBheWxvYWQiOiJ7XCJ1c2VybmFtZVwiOlwidXNlcm5hbWVfMTFcIixcInBhc3N3b3JkXCI6XCJcIixcImVtYWlsXCI6XCJlbWFpbF8xMVwiLFwidHlwZVwiOlwiQURNSU5cIixcImlkXCI6XCIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMGJcIixcImNyZWF0ZWRBdFwiOlwiMjAyNi0wOS0yMFQwOToxOTo0NS4xOTg5NzM2OTdaW1VUQ11cIixcInVwZGF0ZWRBdFwiOlwiMjAyNi0wOS0yMFQwOToxOTo0NS4xOTg5OTA5NThaW1VUQ11cIn0iLCJleHAiOjE3ODk4OTk1ODV9.tB8tYL0L0jueTTSBAo_QKdKRtuup9N6JetzEyXJb_uK70gG485KWNtzo_CRUkAyXpP-pNfB611NGgPgo9J__Mg
 
 {
-  "username": "john",
-  "password": "hashed-password",
-  "email": "encrypted-email",
+  "id": "00000000-0000-0000-0000-000000b00003",
+  "createdAt": "2026-09-20T11:22:00.000Z",
+  "updatedAt": "2026-09-20T11:22:00.000Z",
+  "username": "username_3",
+  "email": "AW6mILpSpzKcJByReWCs1piESHt3HEN7hJcEzQ==",
+  "password": "$argon2id$v=19$m=16384,t=3,p=1$51ECjOtTdTNGK5Q6PudxBA$0eeI8hCXQzSOmKklDIkGEu9ZnB5uFFkNq2VxI19OPSM",
   "type": "CUSTOMER"
 }
-
-
 ### Update user
 PUT {{baseUrl}}/entities/users/{{userId}}
 Content-Type: application/json
+Authorization: Bearer eyJraWQiOiJPUDlCNUEiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOlsiYXBpIl0sInBheWxvYWQiOiJ7XCJ1c2VybmFtZVwiOlwidXNlcm5hbWVfMTFcIixcInBhc3N3b3JkXCI6XCJcIixcImVtYWlsXCI6XCJlbWFpbF8xMVwiLFwidHlwZVwiOlwiQURNSU5cIixcImlkXCI6XCIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMGJcIixcImNyZWF0ZWRBdFwiOlwiMjAyNi0wOS0yMFQwOToxOTo0NS4xOTg5NzM2OTdaW1VUQ11cIixcInVwZGF0ZWRBdFwiOlwiMjAyNi0wOS0yMFQwOToxOTo0NS4xOTg5OTA5NThaW1VUQ11cIn0iLCJleHAiOjE3ODk4OTk1ODV9.tB8tYL0L0jueTTSBAo_QKdKRtuup9N6JetzEyXJb_uK70gG485KWNtzo_CRUkAyXpP-pNfB611NGgPgo9J__Mg
 
 {
-  "id": "{{userId}}",
-  "username": "john-updated",
-  "password": "hashed-password",
-  "email": "encrypted-email",
+  "id": "00000000-0000-0000-0000-000000a00003",
+  "createdAt": "2026-09-20T11:22:00.000Z",
+  "updatedAt": "2026-09-20T11:22:00.000Z",
+  "username": "username_4",
+  "email": "AW6mILpSpzKcJByReWCs1piESHt3HEN7hJcEzQ==",
+  "password": "$argon2id$v=19$m=16384,t=3,p=1$51ECjOtTdTNGK5Q6PudxBA$0eeI8hCXQzSOmKklDIkGEu9ZnB5uFFkNq2VxI19OPSM",
   "type": "CUSTOMER"
 }
 
-
 ### Delete user
-DELETE {{baseUrl}}/entities/users/{{userId}}
+DELETE {{baseUrl}}/entities/users/00000000-0000-0000-0000-000000a00003
+Authorization: Bearer eyJraWQiOiJPUDlCNUEiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOlsiYXBpIl0sInBheWxvYWQiOiJ7XCJ1c2VybmFtZVwiOlwidXNlcm5hbWVfMTFcIixcInBhc3N3b3JkXCI6XCJcIixcImVtYWlsXCI6XCJlbWFpbF8xMVwiLFwidHlwZVwiOlwiQURNSU5cIixcImlkXCI6XCIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMGJcIixcImNyZWF0ZWRBdFwiOlwiMjAyNi0wOS0yMFQwOToxOTo0NS4xOTg5NzM2OTdaW1VUQ11cIixcInVwZGF0ZWRBdFwiOlwiMjAyNi0wOS0yMFQwOToxOTo0NS4xOTg5OTA5NThaW1VUQ11cIn0iLCJleHAiOjE3ODk4OTk1ODV9.tB8tYL0L0jueTTSBAo_QKdKRtuup9N6JetzEyXJb_uK70gG485KWNtzo_CRUkAyXpP-pNfB611NGgPgo9J__Mg
 
 
 ### ============================================================
