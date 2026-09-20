@@ -1,0 +1,23 @@
+CREATE TABLE logs_audit
+(
+    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    user_id     TEXT,
+    request_id  TEXT,
+
+    operation   TEXT NOT NULL,
+    table_name  TEXT NOT NULL,
+    primary_key JSONB,
+
+    changes     JSONB NOT NULL
+);
+
+CREATE INDEX idx_logs_audit_occurred_at
+    ON logs_audit (occurred_at);
+
+CREATE INDEX idx_logs_audit_user_id
+    ON logs_audit (user_id);
+
+CREATE INDEX idx_logs_audit_table_primary_key
+    ON logs_audit (table_name, primary_key);

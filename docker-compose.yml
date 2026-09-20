@@ -20,7 +20,7 @@ services:
       FLYWAY_CONNECT_RETRIES: "30"
       FLYWAY_VALIDATE_MIGRATION_NAMING: "true"
       FLYWAY_BASELINE_VERSION: "0"
-      FLYWAY_TABLE: "flyway_migration_history"
+      FLYWAY_TABLE: "logs_migration"
     command:
       - migrate
     volumes:
@@ -32,13 +32,13 @@ services:
     image: flyway/flyway:10.20.1
     environment:
       FLYWAY_URL: "jdbc:${DB_TYPE}://postgres:5432/${DB_NAME}"
-      FLYWAY_USER: "SA"
-      FLYWAY_PASSWORD: "YourStrong!Passw0rd"
+      FLYWAY_USER: ${DB_USER}
+      FLYWAY_PASSWORD: ${DB_PASSWORD}
       FLYWAY_LOCATIONS: "filesystem:/flyway/seed"
       FLYWAY_BASELINE_ON_MIGRATE: "true"
       FLYWAY_CONNECT_RETRIES: "30"
       FLYWAY_VALIDATE_MIGRATION_NAMING: "true"
-      FLYWAY_TABLE: "flyway_seed_history"
+      FLYWAY_TABLE: "logs_seed"
       FLYWAY_BASELINE_VERSION: "0"
     command:
       - migrate
