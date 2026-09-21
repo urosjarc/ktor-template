@@ -23,3 +23,5 @@ docker
 
 ### Logging ###
 logs
+
+infra/redis/users.acl

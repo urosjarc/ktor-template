@@ -1,0 +1,2 @@
+user default off
+user <CACHE_USER> on ><CACHE_PASSWORD> ~* +@all

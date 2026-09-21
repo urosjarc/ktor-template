@@ -24,13 +24,16 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed" }
 exposed-r2dbc = { module = "org.jetbrains.exposed:exposed-r2dbc", version.ref = "exposed" }
 exposed-kotlin-datetime = { module = "org.jetbrains.exposed:exposed-kotlin-datetime", version.ref = "exposed" }
-r2dbc-pool = {module = "io.r2dbc:r2dbc-pool", version = "1.0.2.RELEASE" }
+r2dbc-pool = { module = "io.r2dbc:r2dbc-pool", version = "1.0.2.RELEASE" }
 
 # DATABASE
 postgresql = { module = "org.postgresql:postgresql", version = "42.7.13" }
 r2dbc-postgresql = { module = "org.postgresql:r2dbc-postgresql", version = "1.1.2.RELEASE" }
 h2database-h2 = { module = "com.h2database:h2", version = "2.4.240" }
 h2database-r2dbc = { module = "io.r2dbc:r2dbc-h2", version = "1.1.0.RELEASE" }
+
+# CACHING
+redis = { module = "eu.vendeli:rethis", version = "0.4.4" }
 
 # LOGGING
 log4j-api-kotlin = { module = "org.apache.logging.log4j:log4j-api-kotlin", version = "1.5.0" }
@@ -92,8 +95,10 @@ logging-runtime = ["log4j-core", "log4j-slf4j2", "log4j-jdbc-dbcp2"]
 security = ["google-tink", "spring-security-core"]
 security-runtime = ["bouncycastle-prov"]
 
-database = ["exposed-core", "exposed-r2dbc", "exposed-kotlin-datetime", "r2dbc-pool" ]
+database = ["exposed-core", "exposed-r2dbc", "exposed-kotlin-datetime", "r2dbc-pool"]
 database-runtime = ["postgresql", "r2dbc-postgresql", "h2database-h2", "h2database-r2dbc"]
+
+caching = ["redis"]
 
 buildsrc = [
     "kotlin-gradle-plugin",

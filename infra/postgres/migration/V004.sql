@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION auto_audit_new_table()
+CREATE OR REPLACE FUNCTION audit_new_table()
     RETURNS event_trigger
     LANGUAGE plpgsql
 AS $$
@@ -31,7 +31,7 @@ BEGIN
 END;
 $$;
 
-CREATE EVENT TRIGGER auto_audit_tables
+CREATE EVENT TRIGGER audit_tables
     ON ddl_command_end
     WHEN TAG IN ('CREATE TABLE')
-EXECUTE FUNCTION auto_audit_new_table();
+EXECUTE FUNCTION audit_new_table();

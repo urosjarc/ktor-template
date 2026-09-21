@@ -1,15 +1,30 @@
 services:
+
   postgres:
     image: postgres:bookworm
     ports:
       - "${DB_PORT}:5432"
-    env_file: ".env"
     environment:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - ./infra/postgres/volume:/var/lib/postgresql/data
 
-  flyway-migration:
+  redis:
+    image: redis:8.2.9
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    volumes:
+      - ./infra/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./infra/redis/users.acl:/data/users.acl:ro
+      - ./infra/redis/volume:/data
+    command:
+      - redis-server
+      - /usr/local/etc/redis/redis.conf
+
+  postgres-migration:
     image: flyway/flyway:10.20.1
     environment:
       FLYWAY_URL: "jdbc:${DB_TYPE}://postgres:5432/${DB_NAME}"
@@ -24,11 +39,11 @@ services:
     command:
       - migrate
     volumes:
-      - ./db/migration:/flyway/migration:ro
+      - ./infra/postgres/migration:/flyway/migration:ro
     depends_on:
       - postgres
 
-  flyway-seed:
+  postgres-seed:
     image: flyway/flyway:10.20.1
     environment:
       FLYWAY_URL: "jdbc:${DB_TYPE}://postgres:5432/${DB_NAME}"
@@ -43,6 +58,6 @@ services:
     command:
       - migrate
     volumes:
-      - ./db/seed:/flyway/seed:ro
+      - ./infra/postgres/seed:/flyway/seed:ro
     depends_on:
       - postgres
