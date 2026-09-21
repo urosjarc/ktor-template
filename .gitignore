@@ -18,12 +18,10 @@ build/
 ### Secrets ###
 .env
 
-### Docker volumes ###
-docker
-
 ### Logging ###
 logs
 
+### DOCKER volumes
 infra/redis/users.acl
 infra/redis/volume
 infra/postgres/volume
