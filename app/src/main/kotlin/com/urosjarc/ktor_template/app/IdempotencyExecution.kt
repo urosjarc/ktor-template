@@ -1,6 +1,5 @@
 package com.urosjarc.ktor_template.app
 
-import kotlin.time.Duration
 import kotlin.uuid.Uuid
 
 public data class IdempotencyExecution(
