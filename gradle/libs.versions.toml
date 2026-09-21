@@ -12,13 +12,15 @@ opentelemetry = "1.63.0"
 
 [libraries]
 
-# OTHERS
-faker = { module = "io.github.serpro69:kotlin-faker", version = "1.16.2" }
-
 # KOTLINX
 kotlinx-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx" }
+kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
+
+
+# OTHERS
+faker = { module = "io.github.serpro69:kotlin-faker", version = "1.16.2" }
 
 # ORM
 exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed" }

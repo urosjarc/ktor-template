@@ -1,4 +1,7 @@
-CREATE TABLE logs_application
+CREATE SCHEMA IF NOT EXISTS system;
+CREATE SCHEMA IF NOT EXISTS public;
+
+CREATE TABLE system.logs_application
 (
     id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     timestamp  TIMESTAMPTZ  NOT NULL,
@@ -14,13 +17,13 @@ CREATE TABLE logs_application
 );
 
 CREATE INDEX idx_logs_application_timestamp
-    ON logs_application (timestamp);
+    ON system.logs_application (timestamp);
 
 CREATE INDEX idx_logs_application_level_timestamp
-    ON logs_application (level, timestamp);
+    ON system.logs_application (level, timestamp);
 
 CREATE INDEX idx_logs_application_request_id
-    ON logs_application (request_id);
+    ON system.logs_application (request_id);
 
 CREATE INDEX idx_logs_application_user_id
-    ON logs_application (user_id);
+    ON system.logs_application (user_id);

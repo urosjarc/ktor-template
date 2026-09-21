@@ -4,10 +4,10 @@
     <Appenders>
 
         <Console name="Console" target="SYSTEM_OUT">
-            <PatternLayout pattern="%d{yyyy.MM.dd HH:mm:ss.SSS} | %40t | reqId=%X{requestId},userId=%X{userId} | %40c:%-3line | %-5level | %msg%n"/>
+            <PatternLayout pattern="%d{yyyy.MM.dd HH:mm:ss.SSS} | %70c:%-3line | %-5level | reqId=%.8X{requestId},userId=%.8X{userId} | %msg%n"/>
         </Console>
 
-        <JDBC name="Database" tableName="logs_application" bufferSize="10" ignoreExceptions="true">
+        <JDBC name="Database" tableName="system.logs_application" bufferSize="10" ignoreExceptions="true">
             <PoolingDriver connectionString="jdbc:${env:DB_TYPE}://${env:DB_DOMAIN}:${env:DB_PORT}/${env:DB_NAME}"
                            userName="${env:DB_USER}"
                            password="${env:DB_PASSWORD}" poolName="LogDatabase"/> <!-- UUID -->

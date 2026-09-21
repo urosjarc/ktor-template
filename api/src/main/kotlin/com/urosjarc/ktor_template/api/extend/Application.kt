@@ -1,13 +1,16 @@
 package com.urosjarc.ktor_template.api.extend
 
 import com.urosjarc.ktor_template.api.Env
+import com.urosjarc.ktor_template.api.plugins.IdempotencyPlugin
 import com.urosjarc.ktor_template.api.plugins.Security
 import com.urosjarc.ktor_template.api.plugins.security
 import com.urosjarc.ktor_template.api.routes.v1.entitiesRoutes
 import com.urosjarc.ktor_template.api.routes.v1.systemRoutes
 import com.urosjarc.ktor_template.app.App
+import com.urosjarc.ktor_template.app.App.usecases.createOrder
 import com.urosjarc.ktor_template.core.domain.User
 import com.urosjarc.ktor_template.core.extend.ext_resourceFile
+import com.urosjarc.ktor_template.core.usecases.CreateOrder
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -31,8 +34,6 @@ import io.micrometer.core.instrument.binder.logging.Log4j2Metrics
 import io.micrometer.core.instrument.binder.system.ProcessorMetrics
 import io.micrometer.core.instrument.binder.system.UptimeMetrics
 import io.micrometer.core.instrument.distribution.DistributionStatisticConfig
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.encodeToJsonElement
 import org.apache.logging.log4j.kotlin.logger
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -147,6 +148,8 @@ fun Application.ext_module() {
     }
     install(SSE)
 
+    install(IdempotencyPlugin)
+
     lateinit var sec: Security
     routing {
         route("api") {
@@ -161,18 +164,12 @@ fun Application.ext_module() {
                         routes {
                             entitiesRoutes()
 
-                            get("/test-security") {
-                                logger.info("INSIDE TEST HANDLER")
+                            post("/orders") {
+                                val input = call.receive<CreateOrder.Input>()
 
-                                val user = call.principal<User>()
-                                    ?: error("Authenticated User is missing.")
+                                val output = createOrder(input)
 
-                                call.respond(
-                                    mapOf(
-                                        "userId" to user.id.value.toString(),
-                                        "role" to user.type.name,
-                                    )
-                                )
+                                call.respond(output)
                             }
                         }
                     }

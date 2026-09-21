@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION audit_row_change()
+CREATE OR REPLACE FUNCTION public.audit_row_change()
     RETURNS TRIGGER
     LANGUAGE plpgsql
 AS
@@ -71,12 +71,12 @@ BEGIN
     /*
      * Write audit event.
      */
-    INSERT INTO logs_audit (user_id,
-                            request_id,
-                            operation,
-                            table_name,
-                            primary_key,
-                            changes)
+    INSERT INTO system.logs_audit (user_id,
+                                   request_id,
+                                   operation,
+                                   table_name,
+                                   primary_key,
+                                   changes)
     VALUES (current_setting('app.user_id', true),
             current_setting('app.request_id', true),
             TG_OP,

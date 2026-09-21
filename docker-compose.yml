@@ -31,6 +31,8 @@ services:
       FLYWAY_URL: "jdbc:${DB_TYPE}://postgres:5432/${DB_NAME}"
       FLYWAY_USER: ${DB_USER}
       FLYWAY_PASSWORD: ${DB_PASSWORD}
+      FLYWAY_SCHEMAS: system,public
+      FLYWAY_DEFAULT_SCHEMA: system
       FLYWAY_LOCATIONS: "filesystem:/flyway/migration"
       FLYWAY_BASELINE_ON_MIGRATE: "true"
       FLYWAY_CONNECT_RETRIES: "30"
@@ -50,6 +52,8 @@ services:
       FLYWAY_URL: "jdbc:${DB_TYPE}://postgres:5432/${DB_NAME}"
       FLYWAY_USER: ${DB_USER}
       FLYWAY_PASSWORD: ${DB_PASSWORD}
+      FLYWAY_SCHEMAS: system,public
+      FLYWAY_DEFAULT_SCHEMA: system
       FLYWAY_LOCATIONS: "filesystem:/flyway/seed"
       FLYWAY_BASELINE_ON_MIGRATE: "true"
       FLYWAY_CONNECT_RETRIES: "30"

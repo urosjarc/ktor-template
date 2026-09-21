@@ -2,6 +2,7 @@ package com.urosjarc.ktor_template.core.extend
 
 import java.io.File
 import java.io.FileOutputStream
+import java.security.MessageDigest
 
 
 public fun String.ext_resourceFile(): File {
@@ -19,3 +20,8 @@ public fun String.ext_resourceFile(): File {
     }
     return tempFile
 }
+
+public fun String.sha256(): String = MessageDigest
+    .getInstance("SHA-256")
+    .digest(this.toByteArray(Charsets.UTF_8))
+    .joinToString("") { "%02x".format(it) }

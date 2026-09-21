@@ -1,4 +1,4 @@
-CREATE TABLE logs_audit
+CREATE TABLE system.logs_audit
 (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -14,10 +14,10 @@ CREATE TABLE logs_audit
 );
 
 CREATE INDEX idx_logs_audit_occurred_at
-    ON logs_audit (occurred_at);
+    ON system.logs_audit (occurred_at);
 
 CREATE INDEX idx_logs_audit_user_id
-    ON logs_audit (user_id);
+    ON system.logs_audit (user_id);
 
 CREATE INDEX idx_logs_audit_table_primary_key
-    ON logs_audit (table_name, primary_key);
+    ON system.logs_audit (table_name, primary_key);

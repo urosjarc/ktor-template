@@ -7,6 +7,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(libs.kotlin.reflect)
     implementation(libs.faker)
     implementation(libs.bundles.security)
     runtimeOnly(libs.bundles.security.runtime)
