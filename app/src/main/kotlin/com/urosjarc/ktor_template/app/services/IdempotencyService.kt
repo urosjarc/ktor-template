@@ -13,6 +13,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.TimeSource
 import kotlin.uuid.Uuid
 
 public class IdempotencyService(
@@ -64,46 +65,58 @@ public class IdempotencyService(
         input: I,
         block: suspend () -> O,
     ): O {
-        val context = currentCoroutineContext()[IdempotencyContextElement]?.value ?: error(
-            "IdempotencyContext is not installed."
-        )
+        val totalMark = TimeSource.Monotonic.markNow()
+
+        val context = currentCoroutineContext()[IdempotencyContextElement]?.value ?: error("IdempotencyContext is not installed.")
 
         val serializers = UseCaseSerializerCache.get(useCase)
+
+        /* Serialize input */
+        val inputSerializationMark = TimeSource.Monotonic.markNow()
 
         val inputJson = JsonService.module.encodeToString(
             serializers.input,
             input,
         )
 
+        val inputSerializationDuration = inputSerializationMark.elapsedNow()
+
         val inputHash = inputJson.sha256()
 
+        /* Create execution candidate */
         val candidate = IdempotencyExecution(
             id = Uuid.random(),
             key = context.key,
-            scope = context.scope ?: error(
-                "Idempotency execution scope is not set."
-            ),
+            scope = context.scope ?: error("Idempotency execution scope is not set."),
             parentId = context.executionId,
             childIndex = context.nextChildIndex(),
             useCase = useCase.name,
             input = inputJson,
             inputHash = inputHash,
             status = IdempotencyExecution.IdempotencyStatus.PROCESSING,
+            timing = IdempotencyExecution.Time(inputSerialization = inputSerializationDuration),
         )
+
+        /* Idempotency lookup */
+        val lookupMark = TimeSource.Monotonic.markNow()
 
         val (record, owner) = repository.getOrCreate(candidate)
 
+        val lookupDuration = lookupMark.elapsedNow()
+
+        /* Different input for the same execution identity. */
         if (record.inputHash != inputHash) {
             throw IdempotencyConflict(
                 "Idempotency conflict for ${useCase.name}: " + "different input for the same execution identity.",
             )
         }
 
+        /* Existing execution. */
         if (!owner) {
             return when (record.status) {
                 IdempotencyExecution.IdempotencyStatus.COMPLETED -> {
                     val output = record.output ?: error(
-                        "Completed execution ${record.id} " + "has no output."
+                        "Completed execution ${record.id} has no output."
                     )
 
                     @Suppress("UNCHECKED_CAST") JsonService.module.decodeFromString(
@@ -124,6 +137,9 @@ public class IdempotencyService(
             }
         }
 
+        /* Store lookup duration only on the execution we own. */
+        record.timing.lookup = lookupDuration
+
         val executionContext = IdempotencyContext(
             key = context.key,
             scope = context.scope,
@@ -131,30 +147,52 @@ public class IdempotencyService(
         )
 
         return try {
+            /* Actual business execution */
+            val executionMark = TimeSource.Monotonic.markNow()
+
             val result = withContext(
                 IdempotencyContextElement(executionContext),
             ) {
                 block()
             }
 
-            record.status = IdempotencyExecution.IdempotencyStatus.COMPLETED
+            record.timing.execution = executionMark.elapsedNow()
+
+            /* Serialize output */
+            val outputSerializationMark = TimeSource.Monotonic.markNow()
 
             record.output = JsonService.module.encodeToString(
                 serializers.output,
                 result,
             )
 
+            record.timing.outputSerialization = outputSerializationMark.elapsedNow()
+
             record.error = null
+            record.status = IdempotencyExecution.IdempotencyStatus.COMPLETED
 
+            /* Persist execution */
+            val persistenceMark = TimeSource.Monotonic.markNow()
             repository.update(record)
+            record.timing.persistence = persistenceMark.elapsedNow()
 
+            /* Total wall-clock duration */
+            record.timing.total = totalMark.elapsedNow()
+
+            /*
+             * NOTE:
+             *
+             * total is intentionally measured independently from
+             * the individual phases. It represents the real elapsed
+             * time of the complete use-case execution.
+             */
             result
         } catch (cause: CancellationException) {
             throw cause
         } catch (cause: Throwable) {
             record.status = IdempotencyExecution.IdempotencyStatus.FAILED
-
             record.error = "${cause::class.qualifiedName}: ${cause.message}"
+            record.timing.total = totalMark.elapsedNow()
 
             repository.update(record)
 

@@ -1,5 +1,6 @@
 package com.urosjarc.ktor_template.app
 
+import kotlin.time.Duration
 import kotlin.uuid.Uuid
 
 public data class IdempotencyExecution(
@@ -14,7 +15,7 @@ public data class IdempotencyExecution(
     public var status: IdempotencyStatus,
     public var output: String? = null,
     public var error: String? = null,
-    public var timing: IdempotencyTiming = IdempotencyTiming(),
+    public var timing: Time = Time(),
 ) {
     public enum class IdempotencyStatus {
         PROCESSING,
@@ -22,20 +23,12 @@ public data class IdempotencyExecution(
         FAILED,
     }
 
-    public data class IdempotencyTiming(
-        public var lookupNanos: Long? = null,
-        public var inputSerializationNanos: Long? = null,
-        public var executionNanos: Long? = null,
-        public var outputSerializationNanos: Long? = null,
-        public var persistenceNanos: Long? = null,
-    ) {
-        public val totalNanos: Long
-            get() = listOf(
-                lookupNanos,
-                inputSerializationNanos,
-                executionNanos,
-                outputSerializationNanos,
-                persistenceNanos,
-            ).filterNotNull().sum()
-    }
+    public data class Time(
+        public var lookup: Duration? = null,
+        public var inputSerialization: Duration? = null,
+        public var execution: Duration? = null,
+        public var outputSerialization: Duration? = null,
+        public var persistence: Duration? = null,
+        public var total: Duration? = null
+    )
 }
