@@ -5,7 +5,7 @@ import com.urosjarc.ktor_template.app.IdempotencyContext
 import com.urosjarc.ktor_template.app.IdempotencyContextElement
 import com.urosjarc.ktor_template.core.usecases.UseCase
 import io.ktor.server.application.*
-import io.ktor.server.plugins.BadRequestException
+import io.ktor.server.plugins.*
 import kotlinx.coroutines.withContext
 import kotlin.uuid.Uuid
 
@@ -21,18 +21,11 @@ val IdempotencyPlugin = createApplicationPlugin(
                 "Missing or invalid Idempotency-Key"
             )
 
-        val idempotencyContext = IdempotencyContext(
-            key = key,
-            scope = null,
-            executionId = null,
-        )
+        val idempotencyContext = IdempotencyContext(key = key, scope = null, executionId = null)
 
         withContext(
-            UseCase.Element(
-                App.services.useCaseExecutor,
-            ) + IdempotencyContextElement(
-                value = idempotencyContext,
-            )
+            UseCase.Element(executor = App.services.idempotency)
+                    + IdempotencyContextElement(value = idempotencyContext)
         ) {
             proceed()
         }

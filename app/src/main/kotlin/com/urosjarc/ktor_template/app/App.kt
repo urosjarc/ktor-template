@@ -2,7 +2,6 @@ package com.urosjarc.ktor_template.app
 
 import com.urosjarc.ktor_template.app.services.IdempotencyService
 import com.urosjarc.ktor_template.app.services.ExposedDbService
-import com.urosjarc.ktor_template.app.services.IdempotencyUseCaseExecutor
 import com.urosjarc.ktor_template.app.services.TinkeyJwtService
 import com.urosjarc.ktor_template.core.domain.Task
 import com.urosjarc.ktor_template.core.domain.User
@@ -61,7 +60,6 @@ public object App {
         services.json = JsonService
         services.jwt = TinkeyJwtService(privateKeyset = Env.KEYSET_JWT)
         services.idempotency = IdempotencyService(InMemoryIdempotencyRepository())
-        services.useCaseExecutor = IdempotencyUseCaseExecutor(services.idempotency)
         // SERVICES
 
         // USECASES
