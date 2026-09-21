@@ -42,10 +42,7 @@ public class IdempotencyService(
         input: I,
         block: suspend () -> O,
     ): O {
-        val parentContext =
-            currentCoroutineContext()[IdempotencyContextElement]
-                ?.value
-                ?: return block()
+        val parentContext = currentCoroutineContext()[IdempotencyContextElement]?.value ?: return block()
 
         val executionContext = parentContext.copy(
             scope = useCase.name,
@@ -67,30 +64,25 @@ public class IdempotencyService(
         input: I,
         block: suspend () -> O,
     ): O {
-        val context =
-            currentCoroutineContext()[IdempotencyContextElement]
-                ?.value
-                ?: error(
-                    "IdempotencyContext is not installed."
-                )
+        val context = currentCoroutineContext()[IdempotencyContextElement]?.value ?: error(
+            "IdempotencyContext is not installed."
+        )
 
         val serializers = UseCaseSerializerCache.get(useCase)
 
-        val inputJson =
-            JsonService.module.encodeToString(
-                serializers.input,
-                input,
-            )
+        val inputJson = JsonService.module.encodeToString(
+            serializers.input,
+            input,
+        )
 
         val inputHash = inputJson.sha256()
 
         val candidate = IdempotencyExecution(
             id = Uuid.random(),
             key = context.key,
-            scope = context.scope
-                ?: error(
-                    "Idempotency execution scope is not set."
-                ),
+            scope = context.scope ?: error(
+                "Idempotency execution scope is not set."
+            ),
             parentId = context.executionId,
             childIndex = context.nextChildIndex(),
             useCase = useCase.name,
@@ -99,44 +91,36 @@ public class IdempotencyService(
             status = IdempotencyExecution.IdempotencyStatus.PROCESSING,
         )
 
-        val (record, owner) =
-            repository.getOrCreate(candidate)
+        val (record, owner) = repository.getOrCreate(candidate)
 
         if (record.inputHash != inputHash) {
             throw IdempotencyConflict(
-                "Idempotency conflict for ${useCase.name}: " +
-                        "different input for the same execution identity.",
+                "Idempotency conflict for ${useCase.name}: " + "different input for the same execution identity.",
             )
         }
 
         if (!owner) {
             return when (record.status) {
                 IdempotencyExecution.IdempotencyStatus.COMPLETED -> {
-                    val output =
-                        record.output
-                            ?: error(
-                                "Completed execution ${record.id} " +
-                                        "has no output."
-                            )
+                    val output = record.output ?: error(
+                        "Completed execution ${record.id} " + "has no output."
+                    )
 
-                    @Suppress("UNCHECKED_CAST")
-                    JsonService.module.decodeFromString(
+                    @Suppress("UNCHECKED_CAST") JsonService.module.decodeFromString(
                         deserializer = serializers.output as KSerializer<O>,
                         string = output,
                     )
                 }
 
-                IdempotencyExecution.IdempotencyStatus.PROCESSING ->
-                    throw IdempotencyPending(
-                        executionId = record.id,
-                        useCase = record.useCase,
-                    )
+                IdempotencyExecution.IdempotencyStatus.PROCESSING -> throw IdempotencyPending(
+                    executionId = record.id,
+                    useCase = record.useCase,
+                )
 
-                IdempotencyExecution.IdempotencyStatus.FAILED ->
-                    throw IdempotencyFailed(
-                        executionId = record.id,
-                        useCase = record.useCase,
-                    )
+                IdempotencyExecution.IdempotencyStatus.FAILED -> throw IdempotencyFailed(
+                    executionId = record.id,
+                    useCase = record.useCase,
+                )
             }
         }
 
@@ -147,21 +131,18 @@ public class IdempotencyService(
         )
 
         return try {
-            val result =
-                withContext(
-                    IdempotencyContextElement(executionContext),
-                ) {
-                    block()
-                }
+            val result = withContext(
+                IdempotencyContextElement(executionContext),
+            ) {
+                block()
+            }
 
-            record.status =
-                IdempotencyExecution.IdempotencyStatus.COMPLETED
+            record.status = IdempotencyExecution.IdempotencyStatus.COMPLETED
 
-            record.output =
-                JsonService.module.encodeToString(
-                    serializers.output,
-                    result,
-                )
+            record.output = JsonService.module.encodeToString(
+                serializers.output,
+                result,
+            )
 
             record.error = null
 
@@ -171,11 +152,9 @@ public class IdempotencyService(
         } catch (cause: CancellationException) {
             throw cause
         } catch (cause: Throwable) {
-            record.status =
-                IdempotencyExecution.IdempotencyStatus.FAILED
+            record.status = IdempotencyExecution.IdempotencyStatus.FAILED
 
-            record.error =
-                "${cause::class.qualifiedName}: ${cause.message}"
+            record.error = "${cause::class.qualifiedName}: ${cause.message}"
 
             repository.update(record)
 
@@ -186,8 +165,7 @@ public class IdempotencyService(
     public suspend fun root(
         key: Uuid,
         scope: String,
-    ): IdempotencyExecution? =
-        repository.findRoot(key, scope)
+    ): IdempotencyExecution? = repository.findRoot(key, scope)
 
     @Serializable
     public data class ExecutionSummary(
@@ -202,9 +180,7 @@ public class IdempotencyService(
     public suspend fun tree(
         rootId: Uuid,
     ): List<ExecutionSummary> {
-        val root =
-            repository.findById(rootId)
-                ?: return emptyList()
+        val root = repository.findById(rootId) ?: return emptyList()
 
         val result = mutableListOf<ExecutionSummary>()
 
