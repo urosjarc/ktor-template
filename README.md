@@ -31,3 +31,13 @@ and both a build cache and a configuration cache (see `gradle.properties`).
 - [x] Database (insert, update) logic
 - [ ] Versioning (env, logs, changelog, db)
 - [ ] When database started (logs)
+
+# Tips and trics...
+
+For seeing the docker volumes without changing permissions...
+
+```aiignore
+USER=urosjarc
+sudo setfacl -R -m u:$USER:rx ./infra/postgres/volume
+sudo setfacl -R -m u:$USER:rx ./infra/redis/volume
+```

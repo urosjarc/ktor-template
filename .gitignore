@@ -25,3 +25,5 @@ docker
 logs
 
 infra/redis/users.acl
+infra/redis/volume
+infra/postgres/volume
