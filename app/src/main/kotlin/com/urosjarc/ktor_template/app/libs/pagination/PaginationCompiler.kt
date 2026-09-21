@@ -1,188 +1,76 @@
-package com.urosjarc.ktor_template.app.repos.exposed
+package com.urosjarc.ktor_template.app.libs.pagination
 
+import com.urosjarc.ktor_template.app.libs.pagination.cursor.PaginationCursor
+import com.urosjarc.ktor_template.app.libs.pagination.cursor.PaginationCursorBase64
+import com.urosjarc.ktor_template.app.libs.pagination.cursor.PaginationCursorCodec
+import com.urosjarc.ktor_template.app.libs.pagination.setup.PaginationDefinition
+import com.urosjarc.ktor_template.app.libs.pagination.outputs.PaginationPage
+import com.urosjarc.ktor_template.app.libs.pagination.outputs.PaginationQueryResult
+import com.urosjarc.ktor_template.app.libs.pagination.setup.PaginationField
+import com.urosjarc.ktor_template.app.libs.pagination.setup.PaginationType
 import com.urosjarc.ktor_template.core.types.Pagination
 import com.urosjarc.ktor_template.core.types.encrypted
 import kotlinx.coroutines.flow.toList
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
-import org.jetbrains.exposed.v1.core.*
-import org.jetbrains.exposed.v1.core.datetime.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonPrimitive
+import org.jetbrains.exposed.v1.core.BasicBinaryColumnType
+import org.jetbrains.exposed.v1.core.BasicUuidColumnType
+import org.jetbrains.exposed.v1.core.BooleanColumnType
+import org.jetbrains.exposed.v1.core.ByteColumnType
+import org.jetbrains.exposed.v1.core.CharacterColumnType
+import org.jetbrains.exposed.v1.core.DecimalColumnType
+import org.jetbrains.exposed.v1.core.DoubleColumnType
+import org.jetbrains.exposed.v1.core.EntityIDColumnType
+import org.jetbrains.exposed.v1.core.EnumerationNameColumnType
+import org.jetbrains.exposed.v1.core.Expression
+import org.jetbrains.exposed.v1.core.FloatColumnType
+import org.jetbrains.exposed.v1.core.IColumnType
+import org.jetbrains.exposed.v1.core.IntegerColumnType
+import org.jetbrains.exposed.v1.core.LongColumnType
+import org.jetbrains.exposed.v1.core.Op
+import org.jetbrains.exposed.v1.core.QueryBuilder
+import org.jetbrains.exposed.v1.core.ResultRow
+import org.jetbrains.exposed.v1.core.ShortColumnType
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.StringColumnType
+import org.jetbrains.exposed.v1.core.UByteColumnType
+import org.jetbrains.exposed.v1.core.UIntegerColumnType
+import org.jetbrains.exposed.v1.core.ULongColumnType
+import org.jetbrains.exposed.v1.core.UShortColumnType
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.compoundAnd
+import org.jetbrains.exposed.v1.core.compoundOr
+import org.jetbrains.exposed.v1.core.datetime.DurationColumnType
+import org.jetbrains.exposed.v1.core.datetime.InstantColumnType
+import org.jetbrains.exposed.v1.core.datetime.LocalDateColumnType
+import org.jetbrains.exposed.v1.core.datetime.LocalDateTimeColumnType
+import org.jetbrains.exposed.v1.core.datetime.LocalTimeColumnType
+import org.jetbrains.exposed.v1.core.datetime.OffsetDateTimeColumnType
+import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.r2dbc.Query
-import java.math.BigDecimal
 import java.security.MessageDigest
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.OffsetDateTime
-import java.util.*
-import kotlin.collections.iterator
+import java.util.Base64
+import java.util.UUID
+import kotlin.collections.all
 import kotlin.time.Duration
-
-public enum class PaginationType {
-    ENUM, STRING, INTEGER, DECIMAL, BOOLEAN, UUID, DATE, DATETIME, BINARY, ENCRYPTED;
-
-    public companion object {
-        public fun from(columnType: IColumnType<*>): PaginationType {
-            val sqlType = columnType.sqlType().uppercase().trim()
-
-            return when {
-                sqlType.startsWith("VARCHAR") || sqlType.startsWith("CHAR") || sqlType.startsWith("TEXT") || sqlType.startsWith("CLOB") -> STRING
-
-                sqlType.startsWith("TINYINT") || sqlType.startsWith("SMALLINT") || sqlType.startsWith("INTEGER") || sqlType.startsWith("INT") || sqlType.startsWith(
-                    "BIGINT"
-                ) -> INTEGER
-
-                sqlType.startsWith("REAL") || sqlType.startsWith("DOUBLE") || sqlType.startsWith("FLOAT") || sqlType.startsWith("DECIMAL") || sqlType.startsWith(
-                    "NUMERIC"
-                ) -> DECIMAL
-
-                sqlType.startsWith("BINARY") || sqlType.startsWith("VARBINARY") || sqlType.startsWith("BYTEA") || sqlType.startsWith("BLOB") -> BINARY
-
-                sqlType.startsWith("TIMESTAMP") || sqlType.startsWith("DATETIME") -> DATETIME
-
-                sqlType.startsWith("BOOLEAN") || sqlType.startsWith("BOOL") -> BOOLEAN
-
-                sqlType.startsWith("UUID") -> UUID
-                sqlType.startsWith("DATE") -> DATE
-
-                columnType is EnumerationNameColumnType<*> -> ENUM
-
-                else -> error(
-                    "Cannot infer pagination type from SQL type: " + columnType.sqlType()
-                )
-            }
-        }
-    }
-}
-
-public enum class FilterPlacement { WHERE, HAVING }
-
-public data class PaginationField<T>(
-    public val expression: ExpressionWithColumnType<T>,
-    public val paginationType: PaginationType? = null,
-    public val filterPlacement: FilterPlacement = FilterPlacement.WHERE,
-) {
-    public val resolvedPaginationType: PaginationType
-        get() = paginationType ?: PaginationType.from(expression.columnType)
-}
-
-public data class PaginationEntity(
-    public val resource: String,
-    public val primaryKey: String,
-)
-
-public data class PaginationDefinition(
-    public val uniqueKey: List<String> = listOf("id"),
-    public val entities: List<PaginationEntity> = emptyList(),
-    public val defaultSort: List<Pagination.Sort> = uniqueKey.map { Pagination.Sort(it, Pagination.Sort.Direction.ASC) },
-    public val fields: Map<String, PaginationField<*>>,
-) {
-    init {
-        require(fields.isNotEmpty()) { "Pagination definition must contain at least one field" }
-        require(uniqueKey.isNotEmpty()) { "Pagination definition must contain a unique key" }
-        require(uniqueKey.all(fields::containsKey)) { "All unique key fields must exist in pagination fields" }
-        require(defaultSort.isNotEmpty()) { "Default sort must contain at least one field" }
-        require(defaultSort.all { fields.containsKey(it.column) }) { "All default sort fields must exist in pagination fields" }
-    }
-
-    public fun columns(): List<ColumnMetadata> = fields.map { (name, field) ->
-        ColumnMetadata(name, field.resolvedPaginationType)
-    }
-
-    public data class ColumnMetadata(val name: String, val type: PaginationType)
-
-    public companion object {
-        public fun <T> field(
-            expression: ExpressionWithColumnType<T>,
-            paginationType: PaginationType? = null,
-            filterPlacement: FilterPlacement = FilterPlacement.WHERE,
-        ): PaginationField<T> = PaginationField(expression, paginationType, filterPlacement)
-    }
-}
-
-public interface CursorCodec {
-    public fun encode(cursor: Cursor): String
-    public fun decode(value: String): Cursor
-}
-
-public data class Cursor(
-    public val queryHash: String,
-    public val sort: List<Pagination.Sort>,
-    public val values: List<String?>,
-)
-
-public object Base64CursorCodec : CursorCodec {
-    @Serializable
-    private data class Payload(val queryHash: String, val sort: List<Pagination.Sort>, val values: List<String?>)
-
-    private val json = Json
-
-    override fun encode(cursor: Cursor): String = Base64.getUrlEncoder().withoutPadding().encodeToString(
-        json.encodeToString(
-            Payload(
-                queryHash = cursor.queryHash,
-                sort = cursor.sort,
-                values = cursor.values,
-            )
-        ).encodeToByteArray()
-    )
-
-    override fun decode(value: String): Cursor {
-        val decoded = try {
-            String(Base64.getUrlDecoder().decode(value), Charsets.UTF_8)
-        } catch (cause: IllegalArgumentException) {
-            throw IllegalArgumentException("Invalid pagination cursor", cause)
-        }
-        val payload = try {
-            json.decodeFromString<Payload>(decoded)
-        } catch (cause: Exception) {
-            throw IllegalArgumentException("Invalid pagination cursor", cause)
-        }
-
-        return Cursor(
-            queryHash = payload.queryHash,
-            sort = payload.sort,
-            values = payload.values,
-        )
-    }
-}
 
 public class PaginationCompiler(
     private val definition: PaginationDefinition,
-    private val cursorCodec: CursorCodec = Base64CursorCodec,
+    private val cursorCodec: PaginationCursorCodec = PaginationCursorBase64,
 ) {
-    public data class Result(
-        val query: Query,
-        val page: Pagination.Page<ResultRow>,
-    ) {
-        public fun toJson(
-            definition: PaginationDefinition,
-        ): JsonArray = buildJsonArray {
-            for (row in page.data) {
-                add(
-                    buildJsonObject {
-                        for ((name, field) in definition.fields) {
-                            val value = row[field.expression]
 
-                            when (value) {
-                                null -> put(name, JsonNull)
-                                is String -> put(name, value)
-                                is Int -> put(name, value)
-                                is Long -> put(name, value)
-                                is Boolean -> put(name, value)
-                                is BigDecimal -> put(name, value.toString())
-                                is UUID -> put(name, value.toString())
-                                is Enum<*> -> put(name, value.name)
-                                else -> put(name, value.toString())
-                            }
-                        }
-                    })
-            }
-        }
-    }
-
-    public suspend fun apply(request: Pagination, source: Query): Result {
+    public suspend fun apply(request: Pagination, source: Query): PaginationQueryResult {
         require(request.limit > 0) { "limit must be greater than zero" }
 
         val sort = normalizeSort(request.sort)
@@ -215,11 +103,11 @@ public class PaginationCompiler(
                 cursor?.let {
                     val cursorExpression = compileCursor(sort, it)
                     when (cursorPlacement(sort)) {
-                        FilterPlacement.WHERE -> adjustWhere {
+                        PaginationField.Place.WHERE -> adjustWhere {
                             this?.and(cursorExpression) ?: cursorExpression
                         }
 
-                        FilterPlacement.HAVING -> adjustHaving {
+                        PaginationField.Place.HAVING -> adjustHaving {
                             this?.and(cursorExpression) ?: cursorExpression
                         }
                     }
@@ -237,7 +125,7 @@ public class PaginationCompiler(
             null
         }
 
-        return Result(query, Pagination.Page(data = page, nextCursor = nextCursor))
+        return PaginationQueryResult(query, PaginationPage(data = page, nextCursor = nextCursor))
     }
 
     private fun canonicalize(element: JsonElement): JsonElement =
@@ -272,7 +160,7 @@ public class PaginationCompiler(
         sort: List<Pagination.Sort>,
         where: Pagination.Filter?,
         having: Pagination.Filter?,
-        cursor: Cursor?,
+        cursor: PaginationCursor?,
     ) {
         if (cursor == null) return
 
@@ -310,7 +198,7 @@ public class PaginationCompiler(
         }
     }
 
-    private fun cursorPlacement(sort: List<Pagination.Sort>): FilterPlacement =
+    private fun cursorPlacement(sort: List<Pagination.Sort>): PaginationField.Place =
         itField(sort.first().column).filterPlacement
 
     private fun compileSort(
@@ -323,12 +211,12 @@ public class PaginationCompiler(
     }.toTypedArray()
 
     private fun compileWhere(filter: Pagination.Filter): Op<Boolean> =
-        compileFilter(filter, FilterPlacement.WHERE)
+        compileFilter(filter, PaginationField.Place.WHERE)
 
     private fun compileHaving(filter: Pagination.Filter): Op<Boolean> =
-        compileFilter(filter, FilterPlacement.HAVING)
+        compileFilter(filter, PaginationField.Place.HAVING)
 
-    private fun compileFilter(filter: Pagination.Filter, placement: FilterPlacement): Op<Boolean> =
+    private fun compileFilter(filter: Pagination.Filter, placement: PaginationField.Place): Op<Boolean> =
         when (filter) {
             is Pagination.Filter.Condition ->
                 compileCondition(filter, placement)
@@ -346,7 +234,7 @@ public class PaginationCompiler(
 
     private fun compileCondition(
         condition: Pagination.Filter.Condition,
-        placement: FilterPlacement,
+        placement: PaginationField.Place,
     ): Op<Boolean> {
         val field = itField(condition.column)
 
@@ -452,7 +340,7 @@ public class PaginationCompiler(
         having: Pagination.Filter?,
         row: ResultRow,
     ): String = cursorCodec.encode(
-        Cursor(
+        PaginationCursor(
             queryHash = queryHash(sort, where, having),
             sort = sort,
             values = sort.map {
@@ -462,7 +350,7 @@ public class PaginationCompiler(
         )
     )
 
-    private fun compileCursor(sort: List<Pagination.Sort>, cursor: Cursor): Op<Boolean> {
+    private fun compileCursor(sort: List<Pagination.Sort>, cursor: PaginationCursor): Op<Boolean> {
         val branches = sort.indices.map { index ->
             val equalities = sort.indices.take(index).map { previousIndex ->
                 val previousSort = sort[previousIndex]

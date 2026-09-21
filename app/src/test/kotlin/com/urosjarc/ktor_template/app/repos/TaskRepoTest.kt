@@ -1,8 +1,8 @@
 package com.urosjarc.ktor_template.app.repos
 
 import com.urosjarc.ktor_template.app.App
-import com.urosjarc.ktor_template.app.repos.exposed.PaginationCompiler
-import com.urosjarc.ktor_template.app.repos.exposed.PaginationDefinition
+import com.urosjarc.ktor_template.app.libs.pagination.PaginationCompiler
+import com.urosjarc.ktor_template.app.libs.pagination.setup.PaginationDefinition
 import com.urosjarc.ktor_template.app.repos.exposed.TaskTable
 import com.urosjarc.ktor_template.app.repos.exposed.UserTable
 import com.urosjarc.ktor_template.core.domain.Task
@@ -11,9 +11,6 @@ import com.urosjarc.ktor_template.core.extend.random
 import com.urosjarc.ktor_template.core.types.Pagination
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
-import org.jetbrains.exposed.v1.core.count
-import org.jetbrains.exposed.v1.core.greaterEq
-import org.jetbrains.exposed.v1.core.like
 import org.jetbrains.exposed.v1.r2dbc.R2dbcTransaction
 import org.jetbrains.exposed.v1.r2dbc.select
 import org.junit.jupiter.api.Assertions.*

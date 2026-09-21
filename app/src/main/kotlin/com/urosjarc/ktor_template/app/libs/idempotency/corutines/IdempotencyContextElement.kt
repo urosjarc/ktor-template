@@ -1,4 +1,4 @@
-package com.urosjarc.ktor_template.app
+package com.urosjarc.ktor_template.app.libs.idempotency.corutines
 
 import kotlin.coroutines.CoroutineContext
 

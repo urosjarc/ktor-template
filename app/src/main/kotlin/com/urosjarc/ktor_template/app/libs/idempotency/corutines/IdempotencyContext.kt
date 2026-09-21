@@ -1,4 +1,4 @@
-package com.urosjarc.ktor_template.app
+package com.urosjarc.ktor_template.app.libs.idempotency.corutines
 
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.uuid.Uuid

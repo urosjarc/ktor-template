@@ -1,5 +1,7 @@
 package com.urosjarc.ktor_template.app.repos.exposed
 
+import com.urosjarc.ktor_template.app.libs.pagination.PaginationCompiler
+import com.urosjarc.ktor_template.app.libs.pagination.setup.PaginationDefinition
 import com.urosjarc.ktor_template.core.domain.Domain
 import com.urosjarc.ktor_template.core.repos.Repo
 import com.urosjarc.ktor_template.core.services.JsonService

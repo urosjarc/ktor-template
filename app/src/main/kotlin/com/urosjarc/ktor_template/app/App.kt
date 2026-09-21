@@ -1,6 +1,8 @@
 package com.urosjarc.ktor_template.app
 
-import com.urosjarc.ktor_template.app.services.IdempotencyService
+import com.urosjarc.ktor_template.app.libs.idempotency.IdempotencyService
+import com.urosjarc.ktor_template.app.libs.idempotency.corutines.IdempotencyContextElement
+import com.urosjarc.ktor_template.app.libs.idempotency.repo.IdempotencyExpRepo
 import com.urosjarc.ktor_template.app.services.ExposedDbService
 import com.urosjarc.ktor_template.app.services.TinkeyJwtService
 import com.urosjarc.ktor_template.core.domain.Task
@@ -13,13 +15,13 @@ import com.urosjarc.ktor_template.core.usecases.CreateCustomer
 import com.urosjarc.ktor_template.core.usecases.CreateOrder
 import com.urosjarc.ktor_template.core.usecases.SendEmail
 import com.urosjarc.ktor_template.core.usecases.UseCase
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.apache.logging.log4j.kotlin.logger
 import org.jetbrains.exposed.v1.core.vendors.PostgreSQLDialect
 import kotlin.concurrent.atomics.AtomicBoolean
-import kotlin.uuid.Uuid
 
 public object App {
 
@@ -59,7 +61,7 @@ public object App {
         )
         services.json = JsonService
         services.jwt = TinkeyJwtService(privateKeyset = Env.KEYSET_JWT)
-        services.idempotency = IdempotencyService(InMemoryIdempotencyRepository())
+        services.idempotency = IdempotencyService(IdempotencyExpRepo())
         // SERVICES
 
         // USECASES
@@ -99,18 +101,23 @@ public object App {
 
     }
 
-    public suspend fun <I : Any, O : Any> execute(useCase: UseCase<I, O>, input: I, key: Uuid, scope: String): O =
-        withContext(
+    public suspend fun <O> execute(
+        scope: String,
+        block: suspend () -> O,
+    ): O {
+        val context = currentCoroutineContext()[IdempotencyContextElement]?.value ?: error("IdempotencyContext is not installed.")
+
+        return withContext(
             IdempotencyContextElement(
-                IdempotencyContext(
-                    key = key,
+                context.copy(
                     scope = scope,
                     executionId = null,
                 ),
-            )
+            ),
         ) {
-            withContext(UseCase.Element(services.useCaseExecutor)) {
-                useCase(input)
+            withContext(UseCase.Element(services.idempotency)) {
+                block()
             }
         }
+    }
 }

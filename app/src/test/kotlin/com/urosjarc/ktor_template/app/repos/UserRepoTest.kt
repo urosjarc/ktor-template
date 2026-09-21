@@ -2,9 +2,9 @@ package com.urosjarc.ktor_template.app.repos
 
 import com.urosjarc.ktor_template.app.App
 import com.urosjarc.ktor_template.app.App.services.db
-import com.urosjarc.ktor_template.app.repos.exposed.FilterPlacement
-import com.urosjarc.ktor_template.app.repos.exposed.PaginationCompiler
-import com.urosjarc.ktor_template.app.repos.exposed.PaginationDefinition
+import com.urosjarc.ktor_template.app.libs.pagination.PaginationCompiler
+import com.urosjarc.ktor_template.app.libs.pagination.setup.PaginationDefinition
+import com.urosjarc.ktor_template.app.libs.pagination.setup.PaginationField
 import com.urosjarc.ktor_template.app.repos.exposed.UserTable
 import com.urosjarc.ktor_template.core.domain.User
 import com.urosjarc.ktor_template.core.extend.random
@@ -237,15 +237,15 @@ class UserRepoTest {
                     fields = mapOf(
                         "username" to PaginationDefinition.field(
                             expression = UserTable.username,
-                            filterPlacement = FilterPlacement.WHERE,
+                            filterPlacement = PaginationField.Place.WHERE,
                         ),
                         "type" to PaginationDefinition.field(
                             expression = UserTable.type,
-                            filterPlacement = FilterPlacement.WHERE,
+                            filterPlacement = PaginationField.Place.WHERE,
                         ),
                         "count" to PaginationDefinition.field(
                             expression = UserTable.id.count(),
-                            filterPlacement = FilterPlacement.HAVING,
+                            filterPlacement = PaginationField.Place.HAVING,
                         ),
                     ),
                 )

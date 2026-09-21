@@ -1,30 +1,36 @@
-CREATE TABLE system.logs_execution
+CREATE TABLE system.logs_idempotency
 (
     id                   UUID PRIMARY KEY,
-
-    root_idempotency_key UUID        NOT NULL,
-    parent_execution_id  UUID REFERENCES system.logs_execution (id),
-
-    use_case             TEXT        NOT NULL,
-
-    input                JSONB       NOT NULL,
-    input_hash           BYTEA       NOT NULL,
-
-    status               TEXT        NOT NULL,
-
-    output               JSONB,
-    error                JSONB,
-
-    started_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
-    completed_at         TIMESTAMPTZ,
-
-    created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+    key                  UUID          NOT NULL,
+    scope                VARCHAR(500)  NOT NULL,
+    parent_id            UUID,
+    child_index          BIGINT        NOT NULL,
+    use_case             VARCHAR(1000) NOT NULL,
+    input                TEXT          NOT NULL,
+    input_hash           VARCHAR(64)   NOT NULL,
+    status               VARCHAR(32)   NOT NULL,
+    output               TEXT,
+    error                TEXT,
+    lookup               BIGINT,
+    input_serialization  BIGINT,
+    execution            BIGINT,
+    output_serialization BIGINT,
+    persistence          BIGINT,
+    total                BIGINT,
+    created_at           TIMESTAMPTZ   NOT NULL,
+    updated_at           TIMESTAMPTZ   NOT NULL
 );
-
-CREATE UNIQUE INDEX ux_use_case_execution_identity
-    ON system.logs_execution (
-                      root_idempotency_key,
-                      parent_execution_id,
-                      use_case,
-                      input_hash
+CREATE UNIQUE INDEX uq_logs_idempotency_identity
+    ON system.logs_idempotency (
+                                key,
+                                scope,
+                                COALESCE(parent_id, '00000000-0000-0000-0000-000000000000'::UUID),
+                                child_index,
+                                use_case
         );
+
+CREATE INDEX idx_logs_idempotency_key_scope
+    ON system.logs_idempotency (key, scope);
+
+CREATE INDEX idx_logs_idempotency_parent
+    ON system.logs_idempotency (parent_id, child_index);

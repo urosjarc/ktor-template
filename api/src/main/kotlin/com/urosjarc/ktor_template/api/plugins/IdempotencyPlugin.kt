@@ -1,8 +1,8 @@
 package com.urosjarc.ktor_template.api.plugins
 
 import com.urosjarc.ktor_template.app.App
-import com.urosjarc.ktor_template.app.IdempotencyContext
-import com.urosjarc.ktor_template.app.IdempotencyContextElement
+import com.urosjarc.ktor_template.app.libs.idempotency.corutines.IdempotencyContext
+import com.urosjarc.ktor_template.app.libs.idempotency.corutines.IdempotencyContextElement
 import com.urosjarc.ktor_template.core.usecases.UseCase
 import io.ktor.server.application.*
 import io.ktor.server.plugins.*
