@@ -11,7 +11,7 @@
             <PoolingDriver connectionString="jdbc:${env:DB_TYPE}://${env:DB_DOMAIN}:${env:DB_PORT}/${env:DB_NAME}"
                            userName="${env:DB_USER}"
                            password="${env:DB_PASSWORD}" poolName="LogDatabase"/> <!-- UUID -->
-            <ColumnMapping name="timestamp" pattern="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX}" columnType="java.sql.Timestamp"/>
+            <ColumnMapping name="created_at" pattern="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX}" columnType="java.sql.Timestamp"/>
             <ColumnMapping name="level" pattern="%level"/>
             <ColumnMapping name="marker" pattern="%marker"/>
             <ColumnMapping name="logger" pattern="%logger"/>

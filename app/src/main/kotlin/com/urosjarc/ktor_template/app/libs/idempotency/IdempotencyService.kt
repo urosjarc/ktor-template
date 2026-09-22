@@ -16,6 +16,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import org.jetbrains.exposed.v1.r2dbc.transactions.suspendTransaction
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.let
 import kotlin.time.TimeSource
 
 public class IdempotencyService(
@@ -49,13 +50,13 @@ public class IdempotencyService(
         input: I,
         block: suspend () -> O,
     ): O {
-        val totalMark = TimeSource.Monotonic.markNow()
-
         val context = currentCoroutineContext()[IdempotencyContextElement]?.value ?: error("IdempotencyContext is not installed.")
 
         val serializers = UseCaseSerializerCache.get(useCase)
 
-        /* Serialize input */
+        /*
+         * Serialize input.
+         */
         val inputSerializationMark = TimeSource.Monotonic.markNow()
 
         val inputJson = JsonService.module.encodeToString(
@@ -67,7 +68,9 @@ public class IdempotencyService(
 
         val inputHash = inputJson.sha256()
 
-        /* Create execution candidate */
+        /*
+         * Create execution candidate.
+         */
         val candidate = Idempotency(
             id = Id(),
             key = context.key,
@@ -78,28 +81,28 @@ public class IdempotencyService(
             input = inputJson,
             inputHash = inputHash,
             status = Idempotency.Status.PROCESSING,
-            time = Idempotency.Time(
+            durations = Idempotency.Durations(
                 inputSerialization = inputSerializationDuration,
             ),
         )
 
-        /* Idempotency lookup */
-        val lookupMark = TimeSource.Monotonic.markNow()
-
+        /*
+         * Persist / find execution.
+         */
         val (record, owner) = suspendTransaction {
             repository.getOrCreate(candidate)
         }
 
-        record.time.lookup = lookupMark.elapsedNow()
-
-        /* Different input for the same execution identity. */
+        /*
+         * Same execution identity must always have the same input.
+         */
         if (record.inputHash != inputHash) {
-            throw RuntimeException(
-                "Idempotency conflict for ${useCase.name}: " + "different input for the same execution identity.",
-            )
+            throw RuntimeException("Idempotency conflict for ${useCase.name}: " + "different input for the same execution identity.")
         }
 
-        /* Existing execution. */
+        /*
+         * Existing execution.
+         */
         if (!owner) {
             return when (record.status) {
                 Idempotency.Status.COMPLETED -> {
@@ -113,23 +116,23 @@ public class IdempotencyService(
                     )
                 }
 
-                Idempotency.Status.PROCESSING -> throw RuntimeException(
-                    "Execution ${record.id} for " + "${record.useCase} is already processing.",
-                )
-
-                Idempotency.Status.FAILED -> throw RuntimeException(
-                    "Execution ${record.id} for " + "${record.useCase} has previously failed.",
-                )
+                Idempotency.Status.PROCESSING -> throw RuntimeException("Execution ${record.id} for " + "${record.useCase} is already processing.")
+                Idempotency.Status.FAILED -> throw RuntimeException("Execution ${record.id} for " + "${record.useCase} has previously failed.")
             }
         }
 
+        /*
+         * This execution owns the execution record.
+         */
         val executionContext = IdempotencyContext(
             key = context.key,
             scope = context.scope,
-            executionId = record.id.value,
+            executionId = record.id.uuid,
         )
 
-        return try {/* Actual business execution */
+        return try {/*
+             * Execute business logic.
+             */
             val executionMark = TimeSource.Monotonic.markNow()
 
             val result = withContext(
@@ -138,9 +141,11 @@ public class IdempotencyService(
                 block()
             }
 
-            record.time.execution = executionMark.elapsedNow()
+            record.durations.execution = executionMark.elapsedNow()
 
-            /* Serialize output */
+            /*
+             * Serialize output.
+             */
             val outputSerializationMark = TimeSource.Monotonic.markNow()
 
             record.output = JsonService.module.encodeToString(
@@ -148,34 +153,10 @@ public class IdempotencyService(
                 result,
             )
 
-            record.time.outputSerialization = outputSerializationMark.elapsedNow()
+            record.durations.outputSerialization = outputSerializationMark.elapsedNow()
 
             record.error = null
             record.status = Idempotency.Status.COMPLETED
-
-            /*
-             * Measure everything up to the final persistence operation.
-             *
-             * Persistence itself is measured separately below.
-             */
-            val persistenceMark = TimeSource.Monotonic.markNow()
-
-            suspendTransaction {
-                repository.update(record)
-            }
-
-            record.time.persistence = persistenceMark.elapsedNow()
-            record.time.total = totalMark.elapsedNow()
-
-            /*
-             * Persist the persistence and total timings.
-             *
-             * This is intentionally a second update because these values
-             * cannot be known until the first persistence operation finishes.
-             */
-            suspendTransaction {
-                repository.update(record)
-            }
 
             result
         } catch (cause: CancellationException) {
@@ -183,22 +164,19 @@ public class IdempotencyService(
         } catch (cause: Throwable) {
             record.status = Idempotency.Status.FAILED
             record.error = "${cause::class.qualifiedName}: ${cause.message}"
-
-            record.time.total = totalMark.elapsedNow()
-
+            throw cause
+        } finally {
             suspendTransaction {
                 repository.update(record)
             }
-
-            throw cause
         }
     }
 
     public suspend fun root(
         key: Id<Idempotency>,
         scope: String,
-    ): Idempotency? = repository.findRoot(key, scope)
-
+    ): Idempotency? =
+        repository.findRoot(key, scope)
     private suspend fun StringBuilder.appendExecution(
         execution: Idempotency,
         prefix: String,
@@ -211,17 +189,47 @@ public class IdempotencyService(
             else -> "+-- "
         }
 
-        appendLine(prefix + connector + "${execution.useCase} [${execution.status}]")
-        val detailPrefix = if (isRoot) "    " else prefix + if (isLast) "    " else "|   "
-        val time = execution.time
-        val total = time.total
+        appendLine(
+            prefix + connector +
+                    "${execution.useCase} [${execution.status}]"
+        )
 
-        appendLine("${detailPrefix}lookup:               ${time.lookup ?: "-"} (${time.lookup.ext_percentageOf(total)})")
-        appendLine("${detailPrefix}input serialization:  ${time.inputSerialization ?: "-"} (${time.inputSerialization.ext_percentageOf(total)})")
-        appendLine("${detailPrefix}execution:            ${time.execution ?: "-"} (${time.execution.ext_percentageOf(total)})")
-        appendLine("${detailPrefix}output serialization: ${time.outputSerialization ?: "-"} (${time.outputSerialization.ext_percentageOf(total)})")
-        appendLine("${detailPrefix}persistence:          ${time.persistence ?: "-"} (${time.persistence.ext_percentageOf(total)})")
-        appendLine("${detailPrefix}total:                ${total ?: "-"} (${total.ext_percentageOf(total)})")
+        val detailPrefix =
+            if (isRoot) {
+                "    "
+            } else {
+                prefix + if (isLast) "    " else "|   "
+            }
+
+        val durations = execution.durations
+
+        val total = execution.events.updatedAt?.let {
+            it - execution.events.createdAt
+        }
+
+        appendLine(
+            "${detailPrefix}input serialization:  " +
+                    "${durations.inputSerialization ?: "-"} " +
+                    "(${durations.inputSerialization.ext_percentageOf(total)})"
+        )
+
+        appendLine(
+            "${detailPrefix}execution:            " +
+                    "${durations.execution ?: "-"} " +
+                    "(${durations.execution.ext_percentageOf(total)})"
+        )
+
+        appendLine(
+            "${detailPrefix}output serialization: " +
+                    "${durations.outputSerialization ?: "-"} " +
+                    "(${durations.outputSerialization.ext_percentageOf(total)})"
+        )
+
+        appendLine(
+            "${detailPrefix}total:                " +
+                    "${total ?: "-"} " +
+                    "(${total.ext_percentageOf(total)})"
+        )
 
         val children = repository.children(execution.id)
 
@@ -241,7 +249,13 @@ public class IdempotencyService(
     public suspend fun treeReport(
         rootId: Id<Idempotency>,
     ): String = suspendTransaction {
-        val root = repository.findById(rootId) ?: return@suspendTransaction "Idempotency $rootId not found."
+        val root =
+            repository.findById(rootId)
+                ?: return@suspendTransaction "Idempotency $rootId not found."
+
+        val total = root.events.updatedAt?.let {
+            it - root.events.createdAt
+        }
 
         buildString {
             appendLine("Idempotency execution")
@@ -250,7 +264,7 @@ public class IdempotencyService(
             appendLine("Key:     ${root.key}")
             appendLine("Scope:   ${root.scope}")
             appendLine("Status:  ${root.status}")
-            appendLine("Total:   ${root.time.total ?: "-"}")
+            appendLine("Total:   ${total ?: "-"}")
             appendLine()
             appendLine("Execution tree")
             appendLine("--------------")
@@ -269,10 +283,10 @@ public class IdempotencyService(
             depth: Int,
         ) {
             result += IdempotencySummary(
-                id = execution.id.value,
+                id = execution.id.uuid,
                 useCase = execution.useCase,
                 status = execution.status,
-                parentId = execution.parentId?.value,
+                parentId = execution.parentId?.uuid,
                 childIndex = execution.childIndex,
                 depth = depth,
             )

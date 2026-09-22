@@ -5,8 +5,8 @@ import kotlin.uuid.Uuid
 
 @JvmInline
 @Serializable
-public value class Id<T>(public val value: Uuid = Uuid.generateV7()) {
-	override fun toString(): String = this.value.toString()
+public value class Id<T>(public val uuid: Uuid = Uuid.generateV7()) {
+	override fun toString(): String = this.uuid.toString()
 }
 
 public fun <T> String.toId(): Id<T> = Id(Uuid.parse(this))

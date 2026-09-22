@@ -138,7 +138,7 @@ fun Application.ext_module() {
     install(CallLogging) {
         callIdMdc("requestId")
         mdc("userId") { call ->
-            call.principal<User>()?.id?.value?.toString()
+            call.principal<User>()?.id?.uuid?.toString()
         }
         format { call ->
             val status = call.response.status()!!

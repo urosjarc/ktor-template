@@ -16,7 +16,7 @@ suspend fun main() {
     App.seed()
 
     println(App.services.idempotency.treeReport(
-        rootId = Id(value = Uuid.parse("01a0c5c4-7723-762f-b541-08a814d138f3")),
+        rootId = Id(uuid = Uuid.parse("01a0c5c4-7723-762f-b541-08a814d138f3")),
     ))
 
     println(App.services.jwt.encode(

@@ -25,7 +25,8 @@ import java.time.OffsetDateTime
 internal abstract class ExpTable<T>(name: String, val serializer: KSerializer<T>) : UuidTable(name, uuidVersion = UuidVersion.V7) {
     abstract val paginationDefinition: PaginationDefinition
     val createdAt = timestampWithTimeZone("created_at")
-    val updatedAt = timestampWithTimeZone("updated_at")
+    val insertedAt = timestampWithTimeZone("inserted_at") // DB managed columns (trigger based)
+    val updatedAt = timestampWithTimeZone("updated_at")   // DB managed columns (trigger based)
     abstract fun toDomain(row: ResultRow): T
     abstract fun toRow(tx: UpdateBuilder<Int>, domain: T)
     fun toJson(row: ResultRow): JsonObject = JsonService.module.encodeToJsonElement(serializer = serializer, value = this.toDomain(row)).jsonObject
@@ -44,11 +45,11 @@ internal open class ExpRepo<T : Domain<T>>(val table: ExpTable<T>) : Repo<T> {
 
     override suspend fun select(): List<T> = table.selectAll().map(table::toDomain).toList()
 
-    override suspend fun select(id: Id<T>): T? = table.selectAll().where { table.id eq id.value }.singleOrNull()?.let(table::toDomain)
+    override suspend fun select(id: Id<T>): T? = table.selectAll().where { table.id eq id.uuid }.singleOrNull()?.let(table::toDomain)
 
     override suspend fun select(ids: List<Id<T>>): List<T> {
         if (ids.isEmpty()) return emptyList()
-        return table.selectAll().where { table.id inList ids.map { it.value } }.map(table::toDomain).toList()
+        return table.selectAll().where { table.id inList ids.map { it.uuid } }.map(table::toDomain).toList()
     }
 
     override suspend fun select(pagination: Pagination): Pagination.Page<JsonObject> {
@@ -61,9 +62,8 @@ internal open class ExpRepo<T : Domain<T>>(val table: ExpTable<T>) : Repo<T> {
 
     override suspend fun insert(obj: T) {
         table.insert {
-            it[table.id] = obj.id.value
-            it[table.createdAt] = OffsetDateTime.now()
-            it[table.updatedAt] = OffsetDateTime.now()
+            it[table.id] = obj.id.uuid
+            it[table.createdAt] = obj.events.createdAt.toOffsetDateTime()
             table.toRow(it, obj)
         }
     }
@@ -76,11 +76,10 @@ internal open class ExpRepo<T : Domain<T>>(val table: ExpTable<T>) : Repo<T> {
     override suspend fun update(obj: T) {
         table.update(
             where = {
-                table.id eq obj.id.value
+                table.id eq obj.id.uuid
             },
         ) {
             table.toRow(it, obj)
-            it[table.updatedAt] = OffsetDateTime.now()
         }
     }
 
@@ -91,9 +90,8 @@ internal open class ExpRepo<T : Domain<T>>(val table: ExpTable<T>) : Repo<T> {
 
     override suspend fun upsert(obj: T) {
         table.upsert {
-            it[table.id] = obj.id.value
+            it[table.id] = obj.id.uuid
             it[table.createdAt] = OffsetDateTime.now()
-            it[table.updatedAt] = OffsetDateTime.now()
             table.toRow(it, obj)
         }
     }
@@ -108,26 +106,26 @@ internal open class ExpRepo<T : Domain<T>>(val table: ExpTable<T>) : Repo<T> {
 
     override suspend fun delete(obj: T) {
         table.deleteWhere {
-            table.id eq obj.id.value
+            table.id eq obj.id.uuid
         }
     }
 
     override suspend fun delete(objs: List<T>) {
         table.deleteWhere {
-            table.id inList objs.map { it.id.value }
+            table.id inList objs.map { it.id.uuid }
         }
     }
 
     override suspend fun deleteId(id: Id<T>) {
         table.deleteWhere {
-            table.id eq id.value
+            table.id eq id.uuid
         }
     }
 
     override suspend fun deleteIds(ids: List<Id<T>>) {
         if (ids.isEmpty()) return
         table.deleteWhere {
-            table.id inList ids.map { it.value }
+            table.id inList ids.map { it.uuid }
         }
     }
 

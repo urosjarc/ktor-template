@@ -17,11 +17,11 @@ class IdTest {
         val id2 = Id<TestEntity>()
 
         // Verify that IDs are created with non-null UUIDs
-        assertNotNull(id1.value)
-        assertNotNull(id2.value)
+        assertNotNull(id1.uuid)
+        assertNotNull(id2.uuid)
 
         // Verify that two consecutive IDs are different (random)
-        assertNotEquals(id1.value, id2.value)
+        assertNotEquals(id1.uuid, id2.uuid)
     }
 
     @Test
@@ -30,7 +30,7 @@ class IdTest {
         val id = Id<TestEntity>(uuid)
 
         // Verify that the ID uses the provided UUID
-        assertEquals(uuid, id.value)
+        assertEquals(uuid, id.uuid)
     }
 
     @Test

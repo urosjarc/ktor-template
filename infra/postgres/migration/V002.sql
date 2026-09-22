@@ -1,7 +1,7 @@
 CREATE TABLE system.logs_audit
 (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    inserted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     user_id     TEXT,
     request_id  TEXT,
@@ -13,8 +13,8 @@ CREATE TABLE system.logs_audit
     changes     JSONB NOT NULL
 );
 
-CREATE INDEX idx_logs_audit_occurred_at
-    ON system.logs_audit (occurred_at);
+CREATE INDEX idx_logs_audit_inserted_at
+    ON system.logs_audit (inserted_at);
 
 CREATE INDEX idx_logs_audit_user_id
     ON system.logs_audit (user_id);

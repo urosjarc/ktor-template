@@ -7,6 +7,7 @@ import com.urosjarc.ktor_template.core.extend.ext_toId
 import com.urosjarc.ktor_template.core.extend.ext_toTimeZoned
 import com.urosjarc.ktor_template.core.repos.Repo
 import com.urosjarc.ktor_template.core.repos.TaskRepo
+import com.urosjarc.ktor_template.core.types.Events
 import com.urosjarc.ktor_template.core.types.Id
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
@@ -31,19 +32,20 @@ internal object TaskTable : ExpTable<Task>("tasks", Task.serializer()) {
     )
 
     override fun toDomain(row: ResultRow) = Task(
+        id = row[id].value.ext_toId(),
         userId = row[user_id].value.ext_toId(),
         name = row[name],
-        id = row[id].value.ext_toId(),
-        createdAt = row[createdAt].ext_toTimeZoned(),
-        updatedAt = row[updatedAt].ext_toTimeZoned(),
+        events = Events(
+            createdAt = row[createdAt].ext_toTimeZoned(),
+            updatedAt = row[updatedAt].ext_toTimeZoned(),
+        ),
     )
 
     override fun toRow(tx: UpdateBuilder<Int>, domain: Task) {
         tx[name] = domain.name
-        tx[user_id] = domain.userId.value
-        tx[id] = EntityID(domain.id.value, this)
-        tx[createdAt] = domain.createdAt.toOffsetDateTime()
-        tx[updatedAt] = domain.updatedAt.toOffsetDateTime()
+        tx[user_id] = domain.userId.uuid
+        tx[id] = EntityID(domain.id.uuid, this)
+        tx[createdAt] = domain.events.createdAt.toOffsetDateTime()
     }
 }
 
@@ -51,11 +53,11 @@ internal object TaskExpRepo : Repo<Task>, TaskRepo, ExpRepo<Task>(table = TaskTa
     override suspend fun selectUserTasks(id: Id<User>): List<Task> =
         TaskTable
             .selectAll()
-            .where { TaskTable.user_id eq id.value }
+            .where { TaskTable.user_id eq id.uuid }
             .map(TaskTable::toDomain).toList()
 
     override suspend fun deleteUserTasks(id: Id<User>): Int =
         TaskTable.deleteWhere {
-            TaskTable.user_id eq id.value
+            TaskTable.user_id eq id.uuid
         }
 }

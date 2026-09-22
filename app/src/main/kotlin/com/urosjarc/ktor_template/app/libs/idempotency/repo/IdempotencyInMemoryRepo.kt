@@ -36,15 +36,15 @@ public class IdempotencyInMemoryRepo : IdempotencyRepo {
 
     override suspend fun findRoot(key: Id<Idempotency>, scope: String): Idempotency? = mutex.withLock {
         records.values.firstOrNull {
-            it.key == key.value && it.scope == scope && it.parentId == null
+            it.key == key.uuid && it.scope == scope && it.parentId == null
         }
     }
 
     override suspend fun findById(id: Id<Idempotency>): Idempotency? = mutex.withLock {
-        records.values.firstOrNull { it.id.value == id.value }
+        records.values.firstOrNull { it.id.uuid == id.uuid }
     }
 
     override suspend fun children(parentId: Id<Idempotency>): List<Idempotency> = mutex.withLock {
-        records.values.filter { it.parentId?.value == parentId.value }.sortedBy { it.childIndex }
+        records.values.filter { it.parentId?.uuid == parentId.uuid }.sortedBy { it.childIndex }
     }
 }
