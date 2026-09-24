@@ -1,5 +1,6 @@
 plugins {
     id("buildSrc.common")
+    alias(libs.plugins.ksp)
 }
 
 kotlin {
@@ -7,6 +8,7 @@ kotlin {
 }
 
 dependencies {
+    ksp(project(":ksp"))
     implementation(libs.kotlin.reflect)
     implementation(libs.faker)
     implementation(libs.bundles.security)

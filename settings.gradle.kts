@@ -23,5 +23,6 @@ dependencyResolutionManagement {
 include(":api")
 include(":app")
 include(":core")
+include(":ksp")
 
 rootProject.name = "ktor-template"
