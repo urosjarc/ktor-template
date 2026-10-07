@@ -6,7 +6,9 @@ plugins {
 kotlin {
     explicitApi()
 }
-
+ksp {
+    arg("generate.module", "core")
+}
 dependencies {
     ksp(project(":ksp"))
     implementation(libs.kotlin.reflect)

@@ -16,7 +16,7 @@ import com.google.devtools.ksp.symbol.Variance
 private const val PUT_ANNOTATION =
     "com.urosjarc.ktor_template.core.annotations.Put"
 
-public class PutProcessor(
+class PutProcessor(
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
 ) : SymbolProcessor {
@@ -24,6 +24,7 @@ public class PutProcessor(
     override fun process(
         resolver: Resolver,
     ): List<KSAnnotated> {
+        logger.warn("! PUT PROCESS")
 
         resolver
             .getSymbolsWithAnnotation(PUT_ANNOTATION)
@@ -34,55 +35,77 @@ public class PutProcessor(
                 val domain = parent as? KSClassDeclaration
                     ?: return@forEach
 
-                generate(domain, properties)
+                generate(
+                    domain = domain,
+                    properties = properties.filterNot { it.isComputed() },
+                )
             }
 
         return emptyList()
     }
 
+    private fun KSPropertyDeclaration.isComputed(): Boolean =
+        annotations
+            .firstOrNull {
+                it.annotationType
+                    .resolve()
+                    .declaration
+                    .qualifiedName
+                    ?.asString() == PUT_ANNOTATION
+            }
+            ?.arguments
+            ?.firstOrNull { it.name?.asString() == "computed" }
+            ?.value as? Boolean
+            ?: false
+
     private fun generate(
         domain: KSClassDeclaration,
         properties: List<KSPropertyDeclaration>,
     ) {
+        logger.warn("Processing: ${domain.qualifiedName?.asString()}")
+        val containingFile = domain.containingFile
+            ?: return
+
         val packageName = "${domain.packageName.asString()}.generated"
         val domainName = domain.simpleName.asString()
         val generatedName = "${domainName}Put"
 
-        val types = properties
-            .map { it.type.resolve() }
-
         val imports = ImportResolver()
 
-        val renderedProperties = properties.mapIndexed { index, property ->
-            val type = types[index]
+        val renderedProperties =
+            properties.mapIndexed { index, property ->
+                val type = property.type.resolve()
 
-            val name = property.simpleName.asString()
-            val renderedType = renderType(type, imports)
+                val name = property.simpleName.asString()
+                val renderedType = renderType(type, imports)
 
-            val comma =
-                if (index < properties.lastIndex) "," else ""
+                val comma =
+                    if (index < properties.lastIndex) "," else ""
 
-            "    public val $name: $renderedType$comma"
-        }
+                "    public val $name: $renderedType$comma"
+            }
 
         val file = codeGenerator.createNewFile(
             dependencies = Dependencies(
                 aggregating = false,
-                domain.containingFile!!,
+                containingFile,
             ),
             packageName = packageName,
             fileName = generatedName,
         )
 
         file.bufferedWriter().use { out ->
-
             out.appendLine("package $packageName")
             out.appendLine()
 
-            out.appendLine("import kotlinx.serialization.Serializable")
+            out.appendLine(
+                "import kotlinx.serialization.Serializable"
+            )
 
             imports.imports
-                .filterNot { it == "kotlinx.serialization.Serializable" }
+                .filterNot {
+                    it == "kotlinx.serialization.Serializable"
+                }
                 .sorted()
                 .forEach { import ->
                     out.appendLine("import $import")

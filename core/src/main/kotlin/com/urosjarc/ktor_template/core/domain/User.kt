@@ -1,24 +1,23 @@
 package com.urosjarc.ktor_template.core.domain
 
+import com.urosjarc.ktor_template.core.annotations.Persistence
+import com.urosjarc.ktor_template.core.annotations.Post
 import com.urosjarc.ktor_template.core.annotations.Put
-import com.urosjarc.ktor_template.core.domain.generated.UserPut
 import com.urosjarc.ktor_template.core.types.Encrypted
 import com.urosjarc.ktor_template.core.types.Events
 import com.urosjarc.ktor_template.core.types.Hashed
 import com.urosjarc.ktor_template.core.types.Id
 import kotlinx.serialization.Serializable
 
+@Persistence(schema = "public", table = "users")
 @Serializable
 public data class User(
     override val id: Id<User> = Id(),
-    @Put
-    val username: String,
-    @Put
-    val password: Hashed,
-    @Put
-    val email: Encrypted,
-    @Put
-    val type: Type,
+    @Put @Post val username: String,
+    @Put @Post val password: Hashed,
+    @Put @Post val email: Encrypted,
+    @Put @Post val type: Type,
+
     override val events: Events = Events()
 ): Domain<User> {
 

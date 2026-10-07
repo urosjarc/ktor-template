@@ -20,7 +20,6 @@ import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.statements.UpdateBuilder
 import org.jetbrains.exposed.v1.datetime.timestampWithTimeZone
 import org.jetbrains.exposed.v1.r2dbc.*
-import java.time.OffsetDateTime
 
 internal abstract class ExpTable<T>(name: String, val serializer: KSerializer<T>) : UuidTable(name, uuidVersion = UuidVersion.V7) {
     abstract val paginationDefinition: PaginationDefinition
@@ -28,7 +27,8 @@ internal abstract class ExpTable<T>(name: String, val serializer: KSerializer<T>
     val insertedAt = timestampWithTimeZone("inserted_at") // DB managed columns (trigger based)
     val updatedAt = timestampWithTimeZone("updated_at")   // DB managed columns (trigger based)
     abstract fun toDomain(row: ResultRow): T
-    abstract fun toRow(tx: UpdateBuilder<Int>, domain: T)
+    abstract fun toInsert(tx: UpdateBuilder<Int>, domain: T)
+    abstract fun toUpdate(tx: UpdateBuilder<Int>, domain: T)
     fun toJson(row: ResultRow): JsonObject = JsonService.module.encodeToJsonElement(serializer = serializer, value = this.toDomain(row)).jsonObject
     fun toDomain(obj: JsonObject): T = JsonService.module.decodeFromJsonElement(deserializer = serializer, element = obj)
 }
@@ -62,9 +62,7 @@ internal open class ExpRepo<T : Domain<T>>(val table: ExpTable<T>) : Repo<T> {
 
     override suspend fun insert(obj: T) {
         table.insert {
-            it[table.id] = obj.id.uuid
-            it[table.createdAt] = obj.events.createdAt.toOffsetDateTime()
-            table.toRow(it, obj)
+            table.toInsert(it, obj)
         }
     }
 
@@ -79,7 +77,7 @@ internal open class ExpRepo<T : Domain<T>>(val table: ExpTable<T>) : Repo<T> {
                 table.id eq obj.id.uuid
             },
         ) {
-            table.toRow(it, obj)
+            table.toUpdate(it, obj)
         }
     }
 
@@ -90,9 +88,7 @@ internal open class ExpRepo<T : Domain<T>>(val table: ExpTable<T>) : Repo<T> {
 
     override suspend fun upsert(obj: T) {
         table.upsert {
-            it[table.id] = obj.id.uuid
-            it[table.createdAt] = OffsetDateTime.now()
-            table.toRow(it, obj)
+            table.toInsert(it, obj)
         }
     }
 

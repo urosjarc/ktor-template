@@ -5,6 +5,7 @@ AS
 $$
 BEGIN
     NEW.inserted_at = now();
+    NEW.updated_at = now();
     RETURN NEW;
 END;
 $$;

@@ -84,7 +84,7 @@ opentelemetry-semconv = { module = "io.opentelemetry.semconv:opentelemetry-semco
 # BUILDSRC
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 kotlin-serialization-plugin = { module = "org.jetbrains.kotlin:kotlin-serialization", version.ref = "kotlin" }
-kover-gradle-plugin = { module = "org.jetbrains.kotlinx:kover-gradle-plugin", version = "0.9.1" }
+kover-gradle-plugin = { module = "org.jetbrains.kotlinx:kover-gradle-plugin", version = "0.9.8" }
 dokka-gradle-plugin = { module = "org.jetbrains.dokka:dokka-gradle-plugin", version = "2.0.0" }
 gradle-test-logger-plugin = { module = "com.adarshr:gradle-test-logger-plugin", version = "4.0.0" }
 

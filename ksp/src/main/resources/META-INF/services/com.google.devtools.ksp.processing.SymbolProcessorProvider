@@ -1,1 +1,3 @@
 com.urosjarc.ktor_template.ksp.PutProcessorProvider
+com.urosjarc.ktor_template.ksp.PostProcessorProvider
+com.urosjarc.ktor_template.ksp.PersistenceProcessorProvider
